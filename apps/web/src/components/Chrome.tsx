@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export async function Chrome({ children }: { children: React.ReactNode }) {
   const session = await auth();
   return <div className="shell">
-    <header className="topbar"><Link className="brand" href="/"><span className="mark">M</span><span>MediCare</span></Link><Link className="chip" href={session ? "/profile" : "/login"}>{session ? "Профиль" : "Войти"}</Link></header>
+    <header className="topbar"><Link className="brand" href="/"><span className="mark">M</span><span>MediCare</span></Link><div className="row"><NotificationBell/><Link className="chip" href={session ? "/profile" : "/login"}>{session ? "Профиль" : "Войти"}</Link></div></header>
     {children}
     <nav className="nav">
       <Link href="/"><strong>⌂</strong>Главная</Link>

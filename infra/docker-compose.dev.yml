@@ -10,6 +10,8 @@ services:
       - medicare_pg:/var/lib/postgresql/data
       - ../db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
       - ../db/migrations/002_doctor_workspace.sql:/docker-entrypoint-initdb.d/002_doctor_workspace.sql:ro
+      - ../db/migrations/003_video_notifications.sql:/docker-entrypoint-initdb.d/003_video_notifications.sql:ro
+      - ../db/migrations/004_outbox_claiming.sql:/docker-entrypoint-initdb.d/004_outbox_claiming.sql:ro
       - ../db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U medicare -d medicare"]
@@ -53,6 +55,16 @@ services:
       mc anonymous set none local/medical-documents;
       exit 0;
       "
+
+  livekit:
+    image: livekit/livekit-server:v1.13.7
+    command: ["--config", "/livekit.yaml", "--node-ip", "127.0.0.1"]
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit/livekit.yaml:/livekit.yaml:ro
 
 volumes:
   medicare_pg:

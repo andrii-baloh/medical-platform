@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { PoolClient } from "pg";
 import { DbService } from "../db/db.service";
 
@@ -36,6 +37,7 @@ type NotificationIntent = {
 const POLL_INTERVAL_MS = Number(process.env.OUTBOX_POLL_INTERVAL_MS ?? 5000);
 const BATCH_SIZE = Number(process.env.OUTBOX_BATCH_SIZE ?? 20);
 const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS ?? 10);
+const CLAIM_TTL_SECONDS = Number(process.env.OUTBOX_CLAIM_TTL_SECONDS ?? 120);
 
 /**
  * Transactional outbox worker.
@@ -43,17 +45,16 @@ const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS ?? 10);
  * Delivery model: at-least-once, safe with multiple worker instances.
  *
  * Transaction strategy (important for PostgreSQL):
- *  - A SHORT transaction claims a batch with `FOR UPDATE SKIP LOCKED`.
- *    Concurrent workers therefore never pick the same rows.
- *  - Each event is then processed in its OWN transaction. A failure in one
- *    event aborts only that event's transaction, so its `attempts` counter can
- *    still be incremented in a fresh transaction, and other events in the
- *    batch are unaffected.
+ *  - A short transaction atomically leases a batch with `FOR UPDATE SKIP LOCKED`
+ *    plus `claimed_by`/`claim_expires_at`, so the lease survives commit.
+ *  - Each event is then processed in its own transaction. A failure in one
+ *    event aborts only that event's transaction, then a fresh statement records
+ *    the failed attempt and releases this worker's lease.
  *  - `published_at` is set only after notifications were inserted successfully.
- *  - Duplicate notifications are prevented by `notifications.dedupe_key`
- *    (partial unique index), so re-processing a claimed event is harmless.
- *  - If the process crashes after claim but before publish, rows remain
- *    unpublished (the claim lock is released on disconnect) and are retried.
+ *  - Duplicate notifications are prevented by `notifications.dedupe_key`, so
+ *    at-least-once retries cannot create duplicate user notifications.
+ *  - If a worker crashes after claim, the lease expires and another worker can
+ *    safely reclaim the still-unpublished event.
  *
  * Medical text (complaints/anamnesis/assessment/recommendations) is never
  * copied into a notification payload.
@@ -61,6 +62,7 @@ const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS ?? 10);
 @Injectable()
 export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OutboxWorker.name);
+  private readonly workerId = `api-${randomUUID()}`;
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
@@ -101,67 +103,82 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Claim a batch in a short transaction. The row locks are held only for the
-   * duration of this transaction; `SKIP LOCKED` makes concurrent workers skip
-   * rows that another worker is already claiming.
-   */
+  /** Atomically lease a batch so another worker cannot process it concurrently. */
   private async claimBatch(): Promise<OutboxRow[]> {
     return this.db.tx(async (client) => {
       const { rows } = await client.query<OutboxRow>(
-        `select id,aggregate_type,aggregate_id,event_type,payload,attempts
-         from outbox_events
-         where published_at is null and attempts < $1
-         order by created_at
-         limit $2
-         for update skip locked`,
-        [MAX_ATTEMPTS, BATCH_SIZE],
+        `with candidates as (
+           select id
+           from outbox_events
+           where published_at is null
+             and attempts < $1
+             and (claim_expires_at is null or claim_expires_at < now())
+           order by created_at
+           limit $2
+           for update skip locked
+         )
+         update outbox_events o
+         set claimed_at = now(),
+             claimed_by = $3,
+             claim_expires_at = now() + ($4::int * interval '1 second')
+         from candidates c
+         where o.id = c.id
+         returning o.id,o.aggregate_type,o.aggregate_id,o.event_type,o.payload,o.attempts`,
+        [MAX_ATTEMPTS, BATCH_SIZE, this.workerId, CLAIM_TTL_SECONDS],
       );
       return rows;
     });
   }
 
-  /**
-   * Process one event in its own transaction.
-   * On failure the transaction rolls back, then a separate transaction records
-   * the attempt increment, so the event is retried later instead of being lost.
-   */
+  /** Process one leased event in its own transaction. */
   private async processEvent(event: OutboxRow): Promise<boolean> {
     try {
-      await this.db.tx(async (client) => {
-        const intents = await this.buildNotifications(client, event);
+      return await this.db.tx(async (client) => {
+        const { rows } = await client.query<OutboxRow>(
+          `select id,aggregate_type,aggregate_id,event_type,payload,attempts
+           from outbox_events
+           where id=$1 and published_at is null and claimed_by=$2
+           for update`,
+          [event.id, this.workerId],
+        );
+        const current = rows[0];
+        if (!current) return false;
+
+        const intents = await this.buildNotifications(client, current);
         for (const intent of intents) {
           await client.query(
             `insert into notifications(user_id,patient_profile_id,appointment_id,type,title,body,payload,dedupe_key)
              values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
-             on conflict (user_id,dedupe_key) do nothing`,
-            [
-              intent.userId,
-              intent.patientProfileId,
-              intent.appointmentId,
-              intent.type,
-              intent.title,
-              intent.body,
-              JSON.stringify(intent.payload),
-              intent.dedupeKey,
-            ],
+             on conflict do nothing`,
+            [intent.userId,intent.patientProfileId,intent.appointmentId,intent.type,intent.title,intent.body,JSON.stringify(intent.payload),intent.dedupeKey],
           );
         }
-        await client.query(`update outbox_events set published_at=now(), attempts=attempts+1 where id=$1`, [event.id]);
+        await client.query(
+          `update outbox_events
+           set published_at=now(), attempts=attempts+1,
+               claimed_at=null, claimed_by=null, claim_expires_at=null
+           where id=$1 and claimed_by=$2`,
+          [event.id, this.workerId],
+        );
+        return true;
       });
-      return true;
     } catch (error) {
-      // Separate transaction: the previous one is aborted and cannot be reused.
       await this.recordFailure(event.id);
       this.logger.error(`Failed to process outbox event ${event.id} (${event.event_type})`);
       return false;
     }
   }
 
-  /** Record a failed attempt without marking the event published. */
+  /** Record a failed attempt and release this worker's lease. */
   private async recordFailure(eventId: string): Promise<void> {
     try {
-      await this.db.query(`update outbox_events set attempts=attempts+1 where id=$1`, [eventId]);
+      await this.db.query(
+        `update outbox_events
+         set attempts=attempts+1,
+             claimed_at=null, claimed_by=null, claim_expires_at=null
+         where id=$1 and published_at is null and claimed_by=$2`,
+        [eventId, this.workerId],
+      );
     } catch (error) {
       this.logger.error(`Failed to record attempt for outbox event ${eventId}`);
     }

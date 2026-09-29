@@ -18,6 +18,23 @@ export type SignedResultDto = {
   previousVersionSha256: string | null;
 };
 
+type OwnedAppointmentRow = {
+  id: string;
+  doctor_id: string;
+  patient_profile_id: string;
+  doctor_name: string;
+  patient_name: string;
+  specialty: string | null;
+};
+
+type ConsultationVersionRow = {
+  version_no: number;
+  snapshot: Record<string, unknown>;
+  content_sha256: string;
+  previous_version_sha256: string | null;
+  signed_at: Date;
+};
+
 @Injectable()
 export class PatientResultsService {
   constructor(
@@ -33,7 +50,7 @@ export class PatientResultsService {
    */
   private async requireOwnedAppointment(principal: Principal, appointmentId: string) {
     const user = await this.users.ensureAccount(principal);
-    const { rows } = await this.db.query(
+    const { rows } = await this.db.query<OwnedAppointmentRow>(
       `select a.id, a.doctor_id, a.patient_profile_id, d.full_name doctor_name,
               p.full_name patient_name,
               coalesce(sp.name_ru, 'Специалист') specialty
@@ -60,11 +77,11 @@ export class PatientResultsService {
       sql += ` and version_no = $2`;
     }
     sql += ` order by version_no desc limit 1`;
-    const { rows } = await this.db.query(sql, params);
+    const { rows } = await this.db.query<ConsultationVersionRow>(sql, params);
     return rows[0];
   }
 
-  private mapResult(appointment: any, version: any): SignedResultDto {
+  private mapResult(appointment: OwnedAppointmentRow, version: ConsultationVersionRow): SignedResultDto {
     const snapshot = (version.snapshot ?? {}) as Record<string, unknown>;
     const asText = (v: unknown) => (typeof v === "string" ? v : "");
     return {
@@ -99,7 +116,7 @@ export class PatientResultsService {
 
   async listVersions(principal: Principal, appointmentId: string): Promise<SignedResultDto[]> {
     const { user, appointment } = await this.requireOwnedAppointment(principal, appointmentId);
-    const { rows } = await this.db.query(
+    const { rows } = await this.db.query<ConsultationVersionRow>(
       `select version_no, snapshot, content_sha256, previous_version_sha256, signed_at
        from consultation_versions where appointment_id = $1 order by version_no desc`,
       [appointmentId],

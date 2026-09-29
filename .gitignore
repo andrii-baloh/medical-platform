@@ -12,6 +12,8 @@ dist
 coverage
 *.tsbuildinfo
 COMMIT_MSG.txt
+AI_TASKS.md
+AI_STATUS.md
 
 # transfer artifacts (do not commit)
 source.zip

@@ -17,12 +17,12 @@ export class VideoController {
 
   @Post("appointments/:id/join")
   joinAsPatient(@CurrentPrincipal() principal: Principal, @Param("id") id: string) {
-    return this.video.join(principal, id);
+    return this.video.join(principal, id, "patient");
   }
 
   @Post("doctor/appointments/:id/join")
   joinAsDoctor(@CurrentPrincipal() principal: Principal, @Param("id") id: string) {
-    return this.video.join(principal, id);
+    return this.video.join(principal, id, "doctor");
   }
 
   @Post("appointments/:id/events")

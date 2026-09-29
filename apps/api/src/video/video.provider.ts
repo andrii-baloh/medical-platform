@@ -25,7 +25,6 @@ export interface IssueTokenInput {
   role: VideoParticipantRole;
   /** Stable internal identity of the joining account. */
   participantId: string;
-  displayName: string;
   ttlSeconds: number;
 }
 

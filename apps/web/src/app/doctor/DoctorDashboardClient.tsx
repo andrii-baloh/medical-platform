@@ -13,7 +13,7 @@ type Dashboard = {
 export function DoctorDashboardClient(){
   const [data,setData]=useState<Dashboard|null>(null); const [error,setError]=useState("");
   const load=()=>browserApi<Dashboard>("/doctor/dashboard").then(setData).catch(e=>setError(e.status===403?"Этот аккаунт не связан с подтверждённым профилем специалиста.":"Не удалось загрузить кабинет."));
-  useEffect(load,[]);
+  useEffect(()=>{void load()},[]);
   if(error) return <main className="doctor-content"><div className="notice error"><b>Доступ к кабинету специалиста</b><p>{error}</p><Link className="btn" href="/login">Войти другим аккаунтом</Link></div></main>;
   if(!data) return <main className="doctor-content"><div className="card">Загрузка рабочего кабинета…</div></main>;
   return <main className="doctor-content">

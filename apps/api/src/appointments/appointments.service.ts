@@ -39,6 +39,38 @@ export class AppointmentsService {
     }));
   }
 
+  async get(principal: Principal, appointmentId: string) {
+    const user = await this.users.ensureAccount(principal);
+    const { rows } = await this.db.query(
+      `select a.id,a.status,a.reason,a.patient_timezone,a.price_minor,a.currency,
+              s.starts_at,s.ends_at,
+              p.id patient_id,p.full_name patient_name,p.birth_date,p.relation_to_owner,
+              d.id doctor_id,d.slug,d.full_name doctor_name,
+              coalesce(sp.name_ru,'Специалист') specialty
+       from appointments a
+       join appointment_slots s on s.id=a.slot_id
+       join patient_profiles p on p.id=a.patient_profile_id
+       join doctor_profiles d on d.id=a.doctor_id
+       left join doctor_specialties ds on ds.doctor_id=d.id and ds.is_primary=true
+       left join specialties sp on sp.id=ds.specialty_id
+       where a.id=$1 and p.owner_user_id=$2`,
+      [appointmentId, user.id],
+    );
+    const r = rows[0];
+    if (!r) throw new NotFoundException("Appointment not found");
+    return {
+      id: r.id,
+      status: r.status,
+      doctor: { id: r.doctor_id, slug: r.slug, fullName: r.doctor_name, specialty: r.specialty },
+      patient: { id: r.patient_id, fullName: r.patient_name, birthDate: r.birth_date, relationToOwner: r.relation_to_owner },
+      startsAt: new Date(r.starts_at).toISOString(),
+      endsAt: new Date(r.ends_at).toISOString(),
+      patientTimezone: r.patient_timezone,
+      price: { amountMinor: r.price_minor, currency: r.currency },
+      reason: r.reason,
+    };
+  }
+
   async book(principal: Principal, input: BookAppointmentDto, idempotencyKey?: string) {
     const user = await this.users.ensureAccount(principal);
     return this.db.tx(async (client) => {

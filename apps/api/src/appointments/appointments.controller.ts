@@ -11,6 +11,11 @@ export class AppointmentsController {
   @Get()
   list(@CurrentPrincipal() principal: Principal) { return this.appointments.list(principal); }
 
+  @Get(":id")
+  get(@CurrentPrincipal() principal: Principal, @Param("id") id: string) {
+    return this.appointments.get(principal, id);
+  }
+
   @Post()
   book(
     @CurrentPrincipal() principal: Principal,

@@ -1,4 +1,4 @@
-# MediCare platform 0.4 — doctor workspace + signed clinical versions
+# MediCare platform 0.5 — video consultations + patient results + notifications
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -12,7 +12,9 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Authorization:** API-side role + relationship + ownership checks
 - **Audit:** append-only `audit_events` plus appointment state history
 - **Clinical records:** mutable draft + immutable signed version snapshots with hash chaining
-- **Reliability:** transactional booking, idempotency keys and transactional outbox
+- **Reliability:** transactional booking, idempotency keys and leased transactional outbox processing
+- **Video:** provider-neutral adapter; local development is configured for self-hosted LiveKit
+- **Notifications:** in-app notifications derived from domain outbox events with deduplication
 - **Country deployment:** isolated country cells instead of one global medical database
 
 See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `docs/DOCTOR_WORKSPACE.md`.
@@ -24,7 +26,10 @@ See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `do
 - atomic appointment booking and patient cancellation;
 - private document upload/download through signed S3 URLs;
 - explicit grant/revoke of one document to one connected doctor;
-- patient consultation list and profile UI.
+- patient consultation list and appointment detail UI;
+- LiveKit video join through short-lived server-issued tokens;
+- read-only access to immutable signed consultation results and version history;
+- in-app notifications with unread count and read/read-all actions.
 
 ## Implemented doctor workspace
 
@@ -36,6 +41,7 @@ Routes under `/doctor` now provide:
 - **patient list** limited to patients who have an appointment relationship with the doctor;
 - **patient card** with that doctor's appointment history and only explicitly granted documents;
 - **appointment workspace** with reason for visit, patient documents and clinical notes;
+- **LiveKit video panel** with camera/microphone controls and server-enforced join window;
 - **start / cancel / complete** appointment transitions;
 - **clinical conclusion draft** (`complaints`, `anamnesis`, `assessment`, `recommendations`);
 - **sign version** operation creating an immutable `consultation_versions` snapshot;
@@ -63,6 +69,8 @@ Development infrastructure:
 - Keycloak: `localhost:8080`
 - MinIO S3: `localhost:9000`
 - MinIO console: `localhost:9001`
+- LiveKit signaling/WebSocket: `localhost:7880`
+- LiveKit RTC TCP/UDP: `7881` / `7882`
 
 Local-only demo accounts imported into Keycloak:
 
@@ -116,6 +124,26 @@ POST /v1/doctor/slots/:id/block
 POST /v1/doctor/slots/:id/unblock
 ```
 
+## Video, patient results and notifications API
+
+```text
+POST /v1/video/appointments/:id/join
+POST /v1/video/doctor/appointments/:id/join
+POST /v1/video/appointments/:id/events
+POST /v1/video/doctor/appointments/:id/close
+
+GET  /v1/appointments/:id
+GET  /v1/appointments/:id/result
+GET  /v1/appointments/:id/result/versions
+
+GET  /v1/notifications
+GET  /v1/notifications/unread-count
+POST /v1/notifications/:id/read
+POST /v1/notifications/read-all
+```
+
+Video access is checked on the backend for ownership/doctor relationship, appointment state and time window. Raw video tokens are never persisted. Patient result endpoints read only immutable signed `consultation_versions`; mutable drafts are never exposed.
+
 ## Quick visual review
 
 Open `doctor-preview.html` directly in a browser. It is a self-contained interactive visual preview and does not connect to the database. The actual Next.js doctor pages use the API endpoints above.
@@ -126,9 +154,9 @@ The repository is an engineering implementation, not a claim of medical/legal co
 
 - admin verification/onboarding for real medical professionals;
 - legally appropriate clinician identity and electronic-signature method;
-- video provider adapter;
+- production LiveKit deployment/provider selection, credentials, TURN/network validation and operational monitoring;
 - payment provider + webhook reconciliation;
-- notification outbox worker (email/SMS/push);
+- outbound notification providers and delivery tracking for email/SMS/push;
 - malware scanning/quarantine pipeline for uploaded files;
 - backup/restore automation and tested disaster recovery;
 - KMS/envelope encryption where required;

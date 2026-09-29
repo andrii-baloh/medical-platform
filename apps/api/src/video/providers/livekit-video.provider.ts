@@ -51,7 +51,6 @@ export class LiveKitVideoProvider implements VideoProvider {
     this.assertConfigured();
     const at = new AccessToken(this.apiKey, this.apiSecret, {
       identity: input.participantId,
-      name: input.displayName,
       ttl: input.ttlSeconds,
     });
     at.addGrant({
