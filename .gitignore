@@ -1,0 +1,23 @@
+node_modules
+.next
+dist
+.env
+.env.local
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+.DS_Store
+coverage
+
+# transfer artifacts (do not commit)
+source.zip
+source-url.txt
+source-v05-url.txt
+transfer.b64
+insert36000.b64
+patch_v05.b64
+patch_v05.zip
+test.txt
+medicare-platform-v04/
