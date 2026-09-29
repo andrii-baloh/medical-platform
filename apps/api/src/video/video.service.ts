@@ -6,12 +6,14 @@ import { AuditService } from "../audit/audit.service";
 import type { Principal } from "../auth/principal";
 import { VIDEO_PROVIDER, type VideoParticipantRole, type VideoProvider } from "./video.provider";
 
-/** How long a join token stays valid. */
+/** Join token lifetime. Short-lived by design; never persisted. */
 const TOKEN_TTL_SECONDS = Number(process.env.VIDEO_TOKEN_TTL_SECONDS ?? 900);
-/** The room may be joined this many minutes before the slot starts. */
-const JOIN_OPENS_MINUTES_BEFORE = Number(process.env.VIDEO_JOIN_OPENS_MINUTES ?? 15);
-/** The room may be joined this many minutes after the slot ends. */
-const JOIN_CLOSES_MINUTES_AFTER = Number(process.env.VIDEO_JOIN_CLOSES_MINUTES ?? 30);
+/** The room may be joined this many minutes before the appointment starts. */
+const JOIN_EARLY_MINUTES = Number(process.env.VIDEO_JOIN_EARLY_MINUTES ?? 15);
+/** The room may be joined this many minutes after the appointment starts. */
+const JOIN_AFTER_START_MINUTES = Number(process.env.VIDEO_JOIN_AFTER_START_MINUTES ?? 120);
+
+const INACTIVE_STATUSES = ["cancelled_by_patient", "cancelled_by_doctor", "no_show"];
 
 type Participant = {
   role: VideoParticipantRole;
@@ -21,8 +23,17 @@ type Participant = {
   doctorId: string;
   patientProfileId: string;
   startsAt: Date;
-  endsAt: Date;
   status: string;
+};
+
+export type VideoJoinResult = {
+  provider: string;
+  roomUrl: string;
+  token: string;
+  expiresAt: string;
+  appointmentId: string;
+  roomStatus: string;
+  role: VideoParticipantRole;
 };
 
 @Injectable()
@@ -39,8 +50,8 @@ export class VideoService {
     const user = await this.users.ensureAccount(principal);
     const { rows } = await this.db.query(
       `select a.id appointment_id, a.doctor_id, a.patient_profile_id, a.status,
-              s.starts_at, s.ends_at,
-              d.account_user_id doctor_user_id, d.full_name doctor_name,
+              s.starts_at,
+              d.account_user_id doctor_user_id, d.full_name doctor_name, d.verified doctor_verified,
               p.owner_user_id patient_owner_user_id, p.full_name patient_name
        from appointments a
        join appointment_slots s on s.id = a.slot_id
@@ -52,7 +63,7 @@ export class VideoService {
     const row = rows[0];
     if (!row) throw new NotFoundException("Appointment not found");
 
-    if (row.doctor_user_id && row.doctor_user_id === user.id) {
+    if (row.doctor_user_id && row.doctor_user_id === user.id && row.doctor_verified) {
       return {
         role: "doctor",
         userId: user.id,
@@ -61,7 +72,6 @@ export class VideoService {
         doctorId: row.doctor_id,
         patientProfileId: row.patient_profile_id,
         startsAt: new Date(row.starts_at),
-        endsAt: new Date(row.ends_at),
         status: row.status,
       };
     }
@@ -74,20 +84,24 @@ export class VideoService {
         doctorId: row.doctor_id,
         patientProfileId: row.patient_profile_id,
         startsAt: new Date(row.starts_at),
-        endsAt: new Date(row.ends_at),
         status: row.status,
       };
     }
     throw new ForbiddenException("Not a participant of this appointment");
   }
 
+  /**
+   * The join window is enforced on the backend for every role.
+   * Frontend may hide the button, but this check is authoritative.
+   */
   private assertJoinWindow(participant: Participant) {
-    if (["cancelled_by_patient", "cancelled_by_doctor", "no_show"].includes(participant.status)) {
+    if (INACTIVE_STATUSES.includes(participant.status)) {
       throw new ConflictException("Appointment is no longer active");
     }
     const now = Date.now();
-    const opensAt = participant.startsAt.getTime() - JOIN_OPENS_MINUTES_BEFORE * 60_000;
-    const closesAt = participant.endsAt.getTime() + JOIN_CLOSES_MINUTES_AFTER * 60_000;
+    const startsAt = participant.startsAt.getTime();
+    const opensAt = startsAt - JOIN_EARLY_MINUTES * 60_000;
+    const closesAt = startsAt + JOIN_AFTER_START_MINUTES * 60_000;
     if (now < opensAt) throw new ConflictException("The consultation room is not open yet");
     if (now > closesAt) throw new ConflictException("The consultation room is closed");
   }
@@ -102,7 +116,8 @@ export class VideoService {
       if (existing[0].status === "closed") throw new ConflictException("The consultation room is closed");
       return existing[0];
     }
-    const roomName = `appt-${participant.appointmentId}`;
+    // Technical room name only: no patient name, no FIO, no raw appointment id.
+    const roomName = `med-${randomUUID()}`;
     const created = await this.provider.createRoom({ roomName, appointmentId: participant.appointmentId });
     const { rows } = await this.db.query(
       `insert into video_rooms(appointment_id, provider, provider_room_id, room_name, status, metadata)
@@ -117,10 +132,18 @@ export class VideoService {
         JSON.stringify(created.metadata ?? {}),
       ],
     );
+    await this.audit.record({
+      actorUserId: participant.userId,
+      actorSubject: null,
+      action: "video.room.create",
+      resourceType: "appointment",
+      resourceId: participant.appointmentId,
+      metadata: { appointmentId: participant.appointmentId, participantRole: participant.role, provider: this.provider.name },
+    });
     return rows[0];
   }
 
-  async issueToken(principal: Principal, appointmentId: string) {
+  async join(principal: Principal, appointmentId: string): Promise<VideoJoinResult> {
     const participant = await this.requireParticipant(principal, appointmentId);
     this.assertJoinWindow(participant);
     const room = await this.ensureRoom(participant);
@@ -133,6 +156,7 @@ export class VideoService {
       ttlSeconds: TOKEN_TTL_SECONDS,
     });
 
+    const roomStatus = room.status === "planned" ? "active" : room.status;
     await this.db.tx(async (client) => {
       if (room.status === "planned") {
         await client.query(
@@ -147,22 +171,24 @@ export class VideoService {
       );
     });
 
+    // The token itself is never written to audit_events, logs or the database.
     await this.audit.record({
       actorUserId: participant.userId,
       actorSubject: principal.sub,
       action: "video.token.issue",
       resourceType: "appointment",
       resourceId: appointmentId,
-      metadata: { role: participant.role, roomId: room.id },
+      metadata: { appointmentId, participantRole: participant.role, provider: this.provider.name },
     });
 
     return {
-      roomId: room.id,
-      role: participant.role,
-      token: issued.token,
+      provider: this.provider.name,
       roomUrl: issued.roomUrl,
+      token: issued.token,
       expiresAt: issued.expiresAt,
-      expiresInSeconds: TOKEN_TTL_SECONDS,
+      appointmentId,
+      roomStatus,
+      role: participant.role,
     };
   }
 
@@ -171,26 +197,20 @@ export class VideoService {
     const participant = await this.requireParticipant(principal, appointmentId);
     if (participant.role !== "doctor") throw new ForbiddenException("Only the doctor can close the room");
 
-    const { rows } = await this.db.query(
-      `select * from video_rooms where appointment_id = $1`,
-      [appointmentId],
-    );
+    const { rows } = await this.db.query(`select * from video_rooms where appointment_id = $1`, [appointmentId]);
     const room = rows[0];
     if (!room) throw new NotFoundException("Room not found");
     if (room.status === "closed") return { id: room.id, status: room.status };
 
     await this.provider.closeRoom(room.provider_room_id);
-    await this.db.query(
-      `update video_rooms set status='closed', closed_at=now(), updated_at=now() where id=$1`,
-      [room.id],
-    );
+    await this.db.query(`update video_rooms set status='closed', closed_at=now(), updated_at=now() where id=$1`, [room.id]);
     await this.audit.record({
       actorUserId: participant.userId,
       actorSubject: principal.sub,
       action: "video.room.close",
       resourceType: "appointment",
       resourceId: appointmentId,
-      metadata: { roomId: room.id },
+      metadata: { appointmentId, participantRole: participant.role, provider: this.provider.name },
     });
     return { id: room.id, status: "closed" };
   }
@@ -198,10 +218,7 @@ export class VideoService {
   /** Record a client-side join/leave so the audit trail is complete. */
   async recordEvent(principal: Principal, appointmentId: string, eventType: "joined" | "left") {
     const participant = await this.requireParticipant(principal, appointmentId);
-    const { rows } = await this.db.query(
-      `select id from video_rooms where appointment_id = $1`,
-      [appointmentId],
-    );
+    const { rows } = await this.db.query(`select id from video_rooms where appointment_id = $1`, [appointmentId]);
     if (!rows[0]) throw new NotFoundException("Room not found");
     await this.db.query(
       `insert into video_join_events(video_room_id, user_id, participant_role, event_type)

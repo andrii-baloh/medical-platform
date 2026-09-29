@@ -10,6 +10,8 @@ dist
 *.key
 .DS_Store
 coverage
+*.tsbuildinfo
+COMMIT_MSG.txt
 
 # transfer artifacts (do not commit)
 source.zip

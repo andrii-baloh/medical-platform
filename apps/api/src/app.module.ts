@@ -9,6 +9,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { AuditModule } from "./audit/audit.module";
 import { HealthController } from "./common/health.controller";
 import { DoctorWorkspaceModule } from "./doctor-workspace/doctor-workspace.module";
+import { VideoModule } from "./video/video.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -22,6 +23,7 @@ import { validateEnv } from "./config/env";
     AppointmentsModule,
     DocumentsModule,
     DoctorWorkspaceModule,
+    VideoModule,
   ],
   controllers: [HealthController],
 })
