@@ -10,6 +10,9 @@ import { AuditModule } from "./audit/audit.module";
 import { HealthController } from "./common/health.controller";
 import { DoctorWorkspaceModule } from "./doctor-workspace/doctor-workspace.module";
 import { VideoModule } from "./video/video.module";
+import { PatientResultsModule } from "./patient-results/patient-results.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { OutboxModule } from "./outbox/outbox.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -24,6 +27,9 @@ import { validateEnv } from "./config/env";
     DocumentsModule,
     DoctorWorkspaceModule,
     VideoModule,
+    PatientResultsModule,
+    NotificationsModule,
+    OutboxModule,
   ],
   controllers: [HealthController],
 })
