@@ -80,9 +80,9 @@ The current payment adapter is for development only. A launch country still requ
 
 Uploaded medical files are no longer activated immediately after S3 upload. The API verifies declared size/content type, inspects file signatures for the allowed formats, computes the authoritative SHA-256 itself, and moves the document to `quarantined`. A leased `document_scan_jobs` worker then obtains a verdict through the provider-neutral `DocumentScannerProvider` interface. Only a `clean` verdict changes the document to `active`; infected/error files remain unavailable for download and sharing.
 
-`DOCUMENT_SCAN_PROVIDER=development-pass` is intentionally a local-development stub. It emits a warning and does **not** perform malware detection. It must be replaced with a real scanner before staging/production use; its existence is not a security or compliance claim.
+`DOCUMENT_SCAN_PROVIDER=development-pass` is intentionally a local-development stub. It emits a warning and does **not** perform malware detection. A production-capable `clamav` adapter is also implemented: it streams the private S3 object to `clamd` using the official `INSTREAM` protocol and never makes the quarantined object public. It still requires real deployment validation, current signature databases, monitoring and country-specific operational controls before handling real patient data.
 
-Migration `006_document_security.sql` also quarantines previously active unscanned files instead of silently labeling them clean.
+Migration `006_document_security.sql` quarantines previously active unscanned files instead of silently labeling them clean. Migration `007_document_scan_recovery.sql` adds an index for expired processing leases; the worker can reclaim jobs after a crashed worker and renews active leases during long scans.
 
 ## Local development
 
@@ -105,6 +105,7 @@ Development infrastructure:
 - MinIO console: `localhost:9001`
 - LiveKit signaling/WebSocket: `localhost:7880`
 - LiveKit RTC TCP/UDP: `7881` / `7882`
+- ClamAV `clamd` (optional real scanner): `localhost:3310`
 
 Local-only demo accounts imported into Keycloak:
 
@@ -210,7 +211,7 @@ The repository is an engineering implementation, not a claim of medical/legal co
 - production LiveKit deployment/provider selection, credentials, TURN/network validation and operational monitoring;
 - real launch-country payment provider, production webhook signature verification, settlement reconciliation and payout operations;
 - outbound notification providers and delivery tracking for email/SMS/push;
-- malware scanning/quarantine pipeline for uploaded files;
+- production validation/monitoring of the implemented ClamAV quarantine pipeline, including signature update operations and capacity testing;
 - backup/restore automation and tested disaster recovery;
 - KMS/envelope encryption where required;
 - observability, alerting, CI/CD and security scanning;

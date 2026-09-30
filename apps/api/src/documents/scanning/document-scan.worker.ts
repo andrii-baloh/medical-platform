@@ -71,9 +71,11 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
         `with candidates as (
            select id
            from document_scan_jobs
-           where status in ('pending','failed')
-             and attempts < $1
-             and (claim_expires_at is null or claim_expires_at < now())
+           where attempts < $1
+             and (
+               (status in ('pending','failed') and (claim_expires_at is null or claim_expires_at < now()))
+               or (status='processing' and claim_expires_at < now())
+             )
            order by created_at
            limit $2
            for update skip locked
@@ -91,6 +93,7 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processJob(job: ScanJob): Promise<boolean> {
+    const stopLeaseHeartbeat = this.startLeaseHeartbeat(job.id);
     try {
       const { rows } = await this.db.query<ScanDocument>(
         `select id,storage_key,mime_type,detected_mime_type,sha256_hex,size_bytes,status,scan_status
@@ -118,7 +121,14 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
       });
 
       if (result.verdict === "clean") {
-        await this.db.tx(async (client) => {
+        return this.db.tx(async (client) => {
+          const lease = await client.query(
+            `select 1 from document_scan_jobs
+             where id=$1 and claimed_by=$2 and status='processing'
+             for update`,
+            [job.id, this.workerId],
+          );
+          if (!lease.rowCount) return false;
           await client.query(
             `update medical_documents
              set status='active',scan_status='clean',scan_provider=$2,scan_completed_at=now(),scan_error_code=null
@@ -132,12 +142,19 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
              where id=$1 and claimed_by=$2`,
             [job.id, this.workerId],
           );
+          return true;
         });
-        return true;
       }
 
       if (result.verdict === "infected") {
-        await this.db.tx(async (client) => {
+        return this.db.tx(async (client) => {
+          const lease = await client.query(
+            `select 1 from document_scan_jobs
+             where id=$1 and claimed_by=$2 and status='processing'
+             for update`,
+            [job.id, this.workerId],
+          );
+          if (!lease.rowCount) return false;
           await client.query(
             `update medical_documents
              set status='quarantined',scan_status='infected',scan_provider=$2,scan_completed_at=now(),scan_error_code=null
@@ -151,8 +168,8 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
              where id=$1 and claimed_by=$2`,
             [job.id, this.workerId],
           );
+          return true;
         });
-        return true;
       }
 
       await this.failJob(job.id, document.id, result.errorCode ?? "scanner_error");
@@ -160,6 +177,27 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
     } catch {
       await this.failJob(job.id, job.document_id, "scanner_exception");
       return false;
+    } finally {
+      stopLeaseHeartbeat();
+    }
+  }
+
+  private startLeaseHeartbeat(jobId: string): () => void {
+    const intervalMs = Math.max(10_000, Math.floor((CLAIM_TTL_SECONDS * 1000) / 3));
+    const timer = setInterval(() => void this.renewLease(jobId), intervalMs);
+    return () => clearInterval(timer);
+  }
+
+  private async renewLease(jobId: string): Promise<void> {
+    try {
+      await this.db.query(
+        `update document_scan_jobs
+         set claim_expires_at=now()+($3::int * interval '1 second'),updated_at=now()
+         where id=$1 and claimed_by=$2 and status='processing'`,
+        [jobId, this.workerId, CLAIM_TTL_SECONDS],
+      );
+    } catch {
+      this.logger.error(`Failed to renew document scan lease for job ${jobId}`);
     }
   }
 
@@ -176,6 +214,13 @@ export class DocumentScanWorker implements OnModuleInit, OnModuleDestroy {
   private async failJob(jobId: string, documentId: string, errorCode: string) {
     try {
       await this.db.tx(async (client) => {
+        const lease = await client.query(
+          `select 1 from document_scan_jobs
+           where id=$1 and claimed_by=$2 and status='processing'
+           for update`,
+          [jobId, this.workerId],
+        );
+        if (!lease.rowCount) return;
         await client.query(
           `update medical_documents
            set status='quarantined',scan_status='error',scan_provider=$2,scan_error_code=$3

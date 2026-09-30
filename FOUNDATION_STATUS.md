@@ -19,37 +19,38 @@
 - authoritative server-side SHA-256 verification after upload
 - quarantine-before-activation document lifecycle
 - provider-neutral `DocumentScannerProvider`
-- leased, retryable multi-worker-safe document scan worker
+- ClamAV `clamd` adapter using streamed `INSTREAM` scanning of private S3 objects
+- leased, retryable multi-worker-safe document scan worker with expired-processing reclaim and lease heartbeat
 - infected/error files remain quarantined and cannot be downloaded or shared
 - existing pre-scan active files are quarantined by migration 006 instead of being silently declared clean
 - patient document UI exposes Проверяется / Проверен / Заблокирован / Ошибка проверки states
 
 ## Important development limitation
 
-`DOCUMENT_SCAN_PROVIDER=development-pass` is a local-development stub only. It does not detect malware. It exists so the quarantine workflow can be exercised without pretending that antivirus protection is present. A real scanner must replace it before staging/production.
+`DOCUMENT_SCAN_PROVIDER=development-pass` is a local-development stub only and does not detect malware. `DOCUMENT_SCAN_PROVIDER=clamav` uses a real ClamAV daemon through the `INSTREAM` protocol, but the ClamAV path has not been runtime-tested on this computer because Docker is unavailable. Production still requires validated signature updates, monitoring, capacity limits and deployment hardening.
 
 The development payment provider likewise does not move real money or process card data.
 
 ## Validated locally
 
-- API TypeScript typecheck passes after document-security implementation
-- Web TypeScript typecheck passes after document-security UI changes
-- previous 0.8 root production build passed with all patient/doctor/admin routes
-- current 0.9 production build is used to validate the complete milestone before commit
+- root 0.9 production build passed after the document-security milestone
+- API TypeScript typecheck passes after the ClamAV adapter and scan-lease recovery hardening
+- API production build passes after the ClamAV adapter and scan-lease recovery hardening
+- Web TypeScript/build validation from the 0.9 milestone remains clean
 
 ## Not runtime-validated on this computer
 
 Docker is not installed and PostgreSQL is not reachable. Therefore these are not claimed as verified:
 
-- executing migrations 003–006 against PostgreSQL
-- starting PostgreSQL/Keycloak/MinIO/LiveKit through Docker
+- executing migrations 003–007 against PostgreSQL
+- starting PostgreSQL/Keycloak/MinIO/LiveKit/ClamAV through Docker
 - real two-party patient ↔ doctor WebRTC
-- real document scan against an antivirus engine
+- real document scan against the ClamAV daemon
 - full booking → payment → upload/quarantine → video → signed result → notification E2E flow
 
 ## Still required for production
 
-- real malware scanner / quarantine service integration
+- runtime validation and production hardening of the implemented ClamAV scanner integration
 - launch-country payment provider and settlement/payout integration
 - production webhook signature verification requirements for that provider
 - real clinician licensing/onboarding operations
