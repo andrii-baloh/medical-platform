@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { browserApi } from "@/lib/api";
 
@@ -31,32 +32,38 @@ type SignedResult = {
   previousVersionSha256: string | null;
 };
 
+const statusLabels: Record<string, string> = {
+  confirmed: "Подтверждён",
+  patient_checked_in: "Пациент подключился",
+  in_progress: "Идёт консультация",
+  completed: "Завершён",
+  cancelled_by_patient: "Отменён пациентом",
+  cancelled_by_doctor: "Отменён врачом",
+  no_show: "Не состоялся",
+};
+
 function formatInZone(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    timeZone,
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat("ru-RU", { timeZone, dateStyle: "long", timeStyle: "short" }).format(new Date(value));
 }
 
 function ResultSection({ result }: { result: SignedResult }) {
+  const sections = [
+    ["Жалобы", result.complaints || "Не указаны"],
+    ["Анамнез", result.anamnesis || "Не указан"],
+    ["Заключение", result.assessment || "Не указано"],
+    ["Рекомендации", result.recommendations || "Не указаны"],
+  ];
   return (
-    <section className="card stack signed-result-card">
-      <div className="between row wrap">
-        <div>
-          <div className="eyebrow">Подписанное заключение</div>
-          <h2>Версия {result.version}</h2>
-        </div>
-        <span className="signed-badge">Подписано</span>
+    <section className="signed-result-modern">
+      <div className="signed-result-header">
+        <div className="signed-result-icon"><DocumentCheckIcon /></div>
+        <div><span className="eyebrow">Медицинское заключение</span><h2>Версия {result.version}</h2><p>Подписано {new Date(result.signedAt).toLocaleString("ru-RU")}</p></div>
+        <span className="signed-badge"><CheckBadgeIcon /> Подписано</span>
       </div>
-      <div><b>Жалобы</b><p>{result.complaints || "Не указаны"}</p></div>
-      <div><b>Анамнез</b><p>{result.anamnesis || "Не указан"}</p></div>
-      <div><b>Заключение</b><p>{result.assessment || "Не указано"}</p></div>
-      <div><b>Рекомендации</b><p>{result.recommendations || "Не указаны"}</p></div>
-      <details className="technical-result">
-        <summary>Идентификатор документа</summary>
-        <code>{result.contentSha256}</code>
-      </details>
+      <div className="signed-result-sections">
+        {sections.map(([title, value]) => <div key={title}><b>{title}</b><p>{value}</p></div>)}
+      </div>
+      <details className="technical-result"><summary>Технический идентификатор документа</summary><code>{result.contentSha256}</code></details>
     </section>
   );
 }
@@ -95,39 +102,22 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
   if (!appointment) return <div className="notice error">{message || "Консультация не найдена."}</div>;
 
   return (
-    <div className="stack consultation-detail-page">
-      <div>
-        <Link className="back" href="/consultations">← Мои консультации</Link>
-        <h1>{appointment.doctor.fullName}</h1>
-        <p className="muted">{appointment.doctor.specialty} · {formatInZone(appointment.startsAt, appointment.patientTimezone)}</p>
-      </div>
+    <div className="consultation-detail-modern">
+      <Link className="back-link-modern" href="/consultations"><ArrowLeftIcon /> Мои консультации</Link>
 
-      <section className="card stack">
-        <div className="between row wrap"><b>Пациент</b><span>{appointment.patient.fullName}</span></div>
-        <div className="between row wrap"><b>Статус</b><span className={`status status-${appointment.status}`}>{appointment.status}</span></div>
-        <div><b>Причина обращения</b><p>{appointment.reason || "Не указана"}</p></div>
+      <section className="consultation-detail-hero">
+        <div className="consultation-avatar large">{appointment.doctor.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
+        <div className="grow"><span className="doctor-specialty">{appointment.doctor.specialty}</span><h1>{appointment.doctor.fullName}</h1><div className="consultation-detail-meta"><span><CalendarDaysIcon /> {formatInZone(appointment.startsAt, appointment.patientTimezone)}</span><span><UserIcon /> {appointment.patient.fullName}</span><span><ClockIcon /> Онлайн</span></div></div>
+        <span className={`status status-${appointment.status}`}>{statusLabels[appointment.status] || appointment.status}</span>
       </section>
 
-      {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && (
-        <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />
-      )}
+      <section className="card consultation-reason-card"><span className="eyebrow">Причина обращения</span><p>{appointment.reason || "Не указана"}</p></section>
+
+      {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />}
 
       {result ? <ResultSection result={result} /> : appointment.status === "completed" ? <div className="notice">Врач ещё не опубликовал подписанное заключение.</div> : null}
 
-      {versions.length > 1 && (
-        <section className="card">
-          <h3>История подписанных версий</h3>
-          <div className="version-list">
-            {versions.map((item) => (
-              <details key={item.version}>
-                <summary>Версия {item.version} · {new Date(item.signedAt).toLocaleString("ru-RU")}</summary>
-                <p>{item.assessment || "Без текста заключения"}</p>
-                <code>{item.contentSha256}</code>
-              </details>
-            ))}
-          </div>
-        </section>
-      )}
+      {versions.length > 1 && <section className="card result-history-card"><span className="eyebrow">История</span><h2>Подписанные версии</h2><div className="version-list">{versions.map((item) => <details key={item.version}><summary>Версия {item.version} · {new Date(item.signedAt).toLocaleString("ru-RU")}</summary><p>{item.assessment || "Без текста заключения"}</p><code>{item.contentSha256}</code></details>)}</div></section>}
     </div>
   );
 }

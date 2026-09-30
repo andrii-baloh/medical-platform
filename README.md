@@ -1,4 +1,4 @@
-# MediCare platform 0.5 — video consultations + patient results + notifications
+# MediCare platform 0.6 — complete patient UI + video consultations + signed results
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -29,7 +29,9 @@ See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `do
 - patient consultation list and appointment detail UI;
 - LiveKit video join through short-lived server-issued tokens;
 - read-only access to immutable signed consultation results and version history;
-- in-app notifications with unread count and read/read-all actions.
+- in-app notifications with unread count and read/read-all actions;
+- unified responsive patient UI for home, doctor discovery/profile, booking, consultations, documents, notifications, profile and login;
+- desktop navigation plus mobile bottom navigation with consistent patient design system.
 
 ## Implemented doctor workspace
 

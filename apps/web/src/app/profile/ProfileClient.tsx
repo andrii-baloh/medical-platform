@@ -1,5 +1,61 @@
 "use client";
-import { useEffect,useState } from "react";
+
+import { useEffect, useState } from "react";
+import { ArrowRightOnRectangleIcon, ClockIcon, EnvelopeIcon, UserGroupIcon, UserIcon } from "@heroicons/react/24/outline";
 import { browserApi } from "@/lib/api";
-type Me={email?:string;fullName?:string;locale:string;timezone:string;countryCode?:string;roles:string[];patientProfiles:{id:string;fullName:string;relationToOwner:string}[]};
-export function ProfileClient(){const [me,setMe]=useState<Me|null>(null),[needLogin,setNeedLogin]=useState(false),[message,setMessage]=useState("");useEffect(()=>{browserApi<Me>("/me").then(setMe).catch((e:any)=>e.status===401?setNeedLogin(true):setMessage("Не удалось загрузить профиль"))},[]);if(needLogin)return <div className="card"><h2>Войдите в аккаунт</h2><a className="btn primary" href="/login">Войти</a></div>;if(message)return <div className="notice error">{message}</div>;if(!me)return <div className="card">Загрузка…</div>;return <div className="stack"><div className="card"><h2 style={{marginBottom:4}}>{me.fullName||me.email}</h2><div className="muted">{me.email}</div><div className="row" style={{marginTop:12,flexWrap:"wrap"}}>{me.roles.map(r=><span className="chip" key={r}>{r}</span>)}</div></div><div className="card"><b>Часовой пояс</b><div className="muted">{me.timezone}</div><hr style={{border:0,borderTop:"1px solid #e6e9f0",margin:"16px 0"}}/><b>Профили пациентов</b>{me.patientProfiles.map(p=><div key={p.id} style={{marginTop:10}}>{p.fullName} <span className="muted">· {p.relationToOwner}</span></div>)}</div>{me.roles.includes("doctor")&&<a className="btn primary" href="/doctor">Открыть кабинет специалиста</a>}<a className="btn danger" href="/api/auth/signout">Выйти</a></div>}
+
+type Me = {
+  email?: string;
+  fullName?: string;
+  locale: string;
+  timezone: string;
+  countryCode?: string;
+  roles: string[];
+  patientProfiles: { id: string; fullName: string; relationToOwner: string }[];
+};
+type ApiError = Error & { status?: number };
+
+export function ProfileClient() {
+  const [me, setMe] = useState<Me | null>(null);
+  const [needLogin, setNeedLogin] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    browserApi<Me>("/me").then(setMe).catch((error: ApiError) => {
+      if (error.status === 401) setNeedLogin(true);
+      else setMessage("Не удалось загрузить профиль.");
+    });
+  }, []);
+
+  if (needLogin) return <div className="card booking-login"><h2>Войдите в аккаунт</h2><p>Профиль доступен только после авторизации.</p><a className="btn primary" href="/login">Войти</a></div>;
+  if (message) return <div className="notice error">{message}</div>;
+  if (!me) return <div className="card">Загрузка профиля…</div>;
+
+  return (
+    <div className="profile-public-grid">
+      <section className="card profile-main-card">
+        <div className="profile-person">
+          <div className="profile-avatar"><UserIcon /></div>
+          <div><span className="eyebrow">Аккаунт пациента</span><h2>{me.fullName || me.email || "Пользователь"}</h2><p><EnvelopeIcon /> {me.email || "Email не указан"}</p></div>
+        </div>
+        <div className="profile-role-row">{me.roles.map((role) => <span className="chip" key={role}>{role}</span>)}</div>
+        <div className="profile-info-list">
+          <div><ClockIcon /><span><small>Часовой пояс</small><b>{me.timezone}</b></span></div>
+          <div><UserGroupIcon /><span><small>Профилей пациентов</small><b>{me.patientProfiles.length}</b></span></div>
+        </div>
+      </section>
+
+      <section className="card family-card">
+        <div className="section-head"><div><span className="eyebrow">Семья</span><h2>Профили пациентов</h2></div></div>
+        <div className="family-list">
+          {me.patientProfiles.map((profile) => <div className="family-row" key={profile.id}><div className="family-avatar">{profile.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><b>{profile.fullName}</b><span>{profile.relationToOwner === "self" ? "Основной профиль" : profile.relationToOwner}</span></div></div>)}
+        </div>
+      </section>
+
+      <section className="profile-actions-card card">
+        {me.roles.includes("doctor") && <a className="btn primary" href="/doctor">Открыть кабинет специалиста</a>}
+        <a className="btn danger" href="/api/auth/signout"><ArrowRightOnRectangleIcon /> Выйти из аккаунта</a>
+      </section>
+    </div>
+  );
+}

@@ -1,18 +1,29 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { NotificationBell } from "@/components/NotificationBell";
+import { PatientNav } from "@/components/PatientNav";
 
 export async function Chrome({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  return <div className="shell">
-    <header className="topbar"><Link className="brand" href="/"><span className="mark">M</span><span>MediCare</span></Link><div className="row"><NotificationBell/><Link className="chip" href={session ? "/profile" : "/login"}>{session ? "Профиль" : "Войти"}</Link></div></header>
-    {children}
-    <nav className="nav">
-      <Link href="/"><strong>⌂</strong>Главная</Link>
-      <Link href="/doctors"><strong>⌕</strong>Врачи</Link>
-      <Link href="/consultations"><strong>▣</strong>Приёмы</Link>
-      <Link href="/documents"><strong>▤</strong>Файлы</Link>
-      <Link href="/profile"><strong>◉</strong>Профиль</Link>
-    </nav>
-  </div>
+  return (
+    <div className="patient-shell">
+      <header className="patient-header">
+        <div className="patient-header-inner">
+          <Link className="brand brand-large" href="/">
+            <span className="mark">M</span>
+            <span><b>MediCare</b><small>онлайн-консультации</small></span>
+          </Link>
+          <PatientNav />
+          <div className="patient-header-actions">
+            {session && <NotificationBell />}
+            <Link className="account-pill" href={session ? "/profile" : "/login"}>
+              <span className="account-dot" />
+              {session ? "Мой профиль" : "Войти"}
+            </Link>
+          </div>
+        </div>
+      </header>
+      <div className="patient-page">{children}</div>
+    </div>
+  );
 }

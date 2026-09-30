@@ -1,3 +1,13 @@
 import { Chrome } from "@/components/Chrome";
 import { ProfileClient } from "./ProfileClient";
-export default function Profile(){return <Chrome><main className="content"><h1>Профиль</h1><ProfileClient/></main></Chrome>}
+
+export default function ProfilePage() {
+  return (
+    <Chrome>
+      <main className="content profile-page-public">
+        <div className="page-heading compact-heading"><span className="eyebrow">Аккаунт</span><h1>Мой профиль</h1><p>Личные данные, профили семьи и настройки кабинета.</p></div>
+        <ProfileClient />
+      </main>
+    </Chrome>
+  );
+}

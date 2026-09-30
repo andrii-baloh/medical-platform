@@ -47,11 +47,8 @@ export function NotificationsClient() {
 
   return (
     <div className="stack notifications-page">
-      <div className="between row wrap">
-        <div>
-          <h1>Уведомления</h1>
-          <p className="muted">Изменения по вашим консультациям и заключениям.</p>
-        </div>
+      <div className="between row wrap notifications-toolbar">
+        <span className="muted">{items.length ? `Всего: ${items.length}` : "Нет новых событий"}</span>
         {items.some((item) => !item.readAt) && <button className="btn" onClick={markAllRead}>Прочитать все</button>}
       </div>
 

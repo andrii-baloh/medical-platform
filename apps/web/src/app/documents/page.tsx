@@ -1,3 +1,13 @@
 import { Chrome } from "@/components/Chrome";
 import { DocumentsClient } from "./DocumentsClient";
-export default function Documents(){return <Chrome><main className="content"><h1>Медицинские документы</h1><p className="muted">Приватное хранилище с выдачей доступа конкретному врачу.</p><DocumentsClient/></main></Chrome>}
+
+export default function DocumentsPage() {
+  return (
+    <Chrome>
+      <main className="content documents-page">
+        <div className="page-heading compact-heading"><span className="eyebrow">Документы</span><h1>Медицинские файлы</h1><p>Приватное хранилище ваших результатов, заключений и обследований.</p></div>
+        <DocumentsClient />
+      </main>
+    </Chrome>
+  );
+}

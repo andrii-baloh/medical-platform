@@ -1,3 +1,13 @@
 import { Chrome } from "@/components/Chrome";
 import { ConsultationsClient } from "./ConsultationsClient";
-export default function Consultations(){return <Chrome><main className="content"><h1>Мои консультации</h1><p className="muted">Предстоящие и завершённые приёмы.</p><ConsultationsClient/></main></Chrome>}
+
+export default function ConsultationsPage() {
+  return (
+    <Chrome>
+      <main className="content consultations-page-public">
+        <div className="page-heading compact-heading"><span className="eyebrow">Мои приёмы</span><h1>Консультации</h1><p>Предстоящие встречи, история приёмов и подписанные заключения.</p></div>
+        <ConsultationsClient />
+      </main>
+    </Chrome>
+  );
+}
