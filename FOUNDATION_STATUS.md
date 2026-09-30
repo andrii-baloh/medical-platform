@@ -1,4 +1,4 @@
-# Foundation status 0.11
+# Foundation status 0.12
 
 ## Completed in code
 
@@ -21,6 +21,9 @@
 - liveness `/health/live` separated from DB-backed readiness `/health/ready`; `/health` remains readiness-compatible
 - verified OIDC `amr`/`acr` extraction and configurable MFA-evidence enforcement for doctor/admin tokens
 - per-instance fixed-window API rate-limit safety net keyed by subject or public client IP, with stricter write limits
+- GitHub Actions CI baseline for install, typecheck, production build, critical dependency audit and whitespace checks
+- PostgreSQL custom-format backup, archive verification and explicit-target destructive restore scripts
+- operational runbook for health checks, migrations, backup drills, secret rotation and provider monitoring
 
 ## Security boundary notes
 
@@ -38,9 +41,11 @@ Access logging does not intentionally record request bodies, query strings, Auth
 
 ## Validation status
 
-- 0.11 root TypeScript typecheck: passed
-- 0.11 root production build: passed
-- 0.11 `git diff --check`: passed (line-ending warnings only)
+- 0.12 root TypeScript typecheck: passed
+- 0.12 root production build: passed
+- 0.12 `npm audit --audit-level=critical`: passed; one high and one moderate PostCSS finding remain behind a breaking Next.js major upgrade
+- 0.12 PowerShell backup/verify/restore scripts: syntax parsed successfully
+- 0.12 `git diff --check`: passed (line-ending warnings only)
 - Docker/PostgreSQL runtime validation remains unavailable on this computer
 
 ## Not runtime-validated on this computer
@@ -63,9 +68,9 @@ Docker is not installed and PostgreSQL is not reachable. Therefore these are not
 - production IdP MFA enrollment/policies and operational recovery procedures
 - runtime validation/monitoring of ClamAV, signature updates and capacity limits
 - real clinician licensing/onboarding operations and legally appropriate e-signature
-- backup/restore automation and tested disaster recovery
+- scheduled/encrypted backup execution, off-host retention and tested disaster recovery (manual backup/restore scripts now exist)
 - KMS/envelope encryption where required
 - metrics/tracing aggregation, alerting and log shipping
-- CI/CD and security scanning
+- deployment automation and broader software-supply-chain/security scanning beyond the current CI baseline
 - retention/deletion policy implementation
 - country-specific consent, telemedicine, data-residency and cross-border configuration

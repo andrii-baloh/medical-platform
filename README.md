@@ -1,4 +1,4 @@
-# MediCare platform 0.11 — patient, doctor, admin, support and production-hardening foundation
+# MediCare platform 0.12 — patient, doctor, admin, support and operational-readiness foundation
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -19,6 +19,7 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Payments:** provider-neutral adapter with development-only provider, webhook reconciliation records, refunds model and patient payment UI
 - **Admin:** API-enforced admin role with operational dashboard, doctor verification, appointments, payments, support queue, outbound delivery journal and audit views without clinical free text
 - **Hardening:** request correlation, audit request IDs, liveness/readiness split, configurable privileged MFA evidence check and per-instance API rate-limit safety net
+- **Operations:** CI verification, PostgreSQL backup/restore scripts and an operational runbook without embedded credentials
 - **Country deployment:** isolated country cells instead of one global medical database
 
 See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `docs/DOCTOR_WORKSPACE.md`.
@@ -99,6 +100,14 @@ Every API request receives a validated or generated `x-request-id`. The request 
 When `REQUIRE_PRIVILEGED_MFA=true`, verified OIDC tokens carrying `doctor` or `admin` roles must also contain an accepted `amr` method or configured `acr` value. The local fixture keeps this disabled until its Keycloak authentication flow is configured for MFA. This technical token check is not a substitute for country-specific clinician identity/e-signature requirements.
 
 The API also has a per-process fixed-window safety-net limiter keyed by authenticated subject or, for public endpoints, client IP. Mutating requests use a stricter limit than reads. Health endpoints are exempt. Multi-instance production deployments still require an edge or distributed limiter; the in-process map is deliberately not presented as a cluster-wide control.
+
+## CI and operational baseline
+
+`.github/workflows/ci.yml` runs dependency installation, root typecheck, production build, a critical-severity dependency audit and whitespace validation on pushes and pull requests. Dependabot is configured for npm and GitHub Actions updates. This is a CI baseline, not a complete secure software supply-chain program.
+
+PostgreSQL backup/verification/restore scripts live under `ops/backup`. They never contain credentials; connection strings are supplied through environment variables. Restore deliberately requires a separate `RESTORE_DATABASE_URL` plus an explicit destructive confirmation flag. See `docs/OPERATIONS.md` for the health, migration, restore-drill, secret-rotation and provider-monitoring runbook.
+
+The current Next.js 15 dependency tree still produces one high and one moderate `npm audit` finding through its pinned PostCSS dependency. `npm audit --audit-level=critical` passes. Removing the remaining finding requires a tested breaking Next.js major upgrade rather than an unreviewed `--force` update, so that migration is tracked separately.
 
 ## Local development
 
