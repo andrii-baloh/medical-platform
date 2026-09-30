@@ -1,4 +1,4 @@
-# MediCare platform 0.6 — complete patient UI + video consultations + signed results
+# MediCare platform 0.7 — unified patient + doctor UI with video consultations and signed results
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -48,7 +48,8 @@ Routes under `/doctor` now provide:
 - **clinical conclusion draft** (`complaints`, `anamnesis`, `assessment`, `recommendations`);
 - **sign version** operation creating an immutable `consultation_versions` snapshot;
 - **SHA-256 hash chain** between signed versions;
-- **explicit amendment** operation that starts the next editable version without changing prior signed versions.
+- **explicit amendment** operation that starts the next editable version without changing prior signed versions;
+- unified responsive doctor UI aligned with the patient design system across dashboard, calendar, patient list/card, consultation workspace and profile.
 
 `consultation_versions` has a PostgreSQL trigger that rejects update/delete operations.
 

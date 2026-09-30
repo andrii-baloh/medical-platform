@@ -1,4 +1,4 @@
-# Foundation status 0.6
+# Foundation status 0.7
 
 ## Completed in code
 
@@ -23,7 +23,7 @@
 - in-app notifications with unread/read/read-all API and UI
 - leased PostgreSQL outbox worker with deduplication and crash-recovery lease expiry
 - local LiveKit Docker configuration
-- responsive desktop/mobile doctor UI
+- unified responsive doctor UI aligned with the patient design system across dashboard, calendar, patients, consultation workspace and profile
 - unified responsive patient UI: home, doctor catalogue/profile, booking, consultations, signed-result view, documents, notifications, profile and login
 - shared desktop/mobile patient navigation and consistent patient design system
 
@@ -34,7 +34,7 @@
 - API production build has passed during this milestone
 - Web production build has passed during this milestone
 
-The 0.6 root `typecheck` and `build` sequence has passed locally after the patient UI redesign.
+The 0.7 root `typecheck` and `build` sequence passed locally after the doctor-workspace UI alignment.
 
 ## Not runtime-validated on this computer
 
@@ -59,4 +59,4 @@ Docker is not installed and PostgreSQL is not currently reachable. Therefore the
 - production MFA enforcement for doctor/admin accounts
 - country-specific retention, consent and telemedicine configuration
 
-The next product milestone is doctor-workspace UI alignment, followed by payments/admin and production infrastructure hardening.
+The next product milestone is payments/admin, followed by production infrastructure hardening.

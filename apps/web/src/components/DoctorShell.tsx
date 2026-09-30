@@ -1,27 +1,68 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  CalendarDaysIcon,
+  HomeIcon,
+  UserGroupIcon,
+  UserCircleIcon,
+  ArrowLeftIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
 
 const items = [
-  ["/doctor","Сегодня","⌂"],
-  ["/doctor/calendar","Календарь","▦"],
-  ["/doctor/patients","Пациенты","◉"],
-  ["/doctor/profile","Профиль","⚙"],
+  { href: "/doctor", label: "Сегодня", icon: HomeIcon },
+  { href: "/doctor/calendar", label: "Календарь", icon: CalendarDaysIcon },
+  { href: "/doctor/patients", label: "Пациенты", icon: UserGroupIcon },
+  { href: "/doctor/profile", label: "Профиль", icon: UserCircleIcon },
 ] as const;
 
+function isActive(pathname: string, href: string) {
+  if (href === "/doctor") return pathname === "/doctor";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function DoctorShell({ children }: { children: React.ReactNode }) {
-  return <div className="doctor-layout">
-    <aside className="doctor-sidebar">
-      <Link className="doctor-brand" href="/doctor"><span className="mark">M</span><span><b>MediCare</b><small>кабинет специалиста</small></span></Link>
-      <nav className="doctor-menu">
-        {items.map(([href,label,icon]) => <Link key={href} href={href}><span>{icon}</span>{label}</Link>)}
+  const pathname = usePathname();
+  return (
+    <div className="doctor-layout doctor-layout-v2">
+      <aside className="doctor-sidebar doctor-sidebar-v2">
+        <Link className="doctor-brand" href="/doctor">
+          <span className="mark">M</span>
+          <span><b>MediCare</b><small>кабинет специалиста</small></span>
+        </Link>
+
+        <div className="doctor-sidebar-label">Рабочее пространство</div>
+        <nav className="doctor-menu doctor-menu-v2">
+          {items.map(({ href, label, icon: Icon }) => (
+            <Link className={isActive(pathname, href) ? "active" : ""} key={href} href={href}>
+              <Icon />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        <div className="doctor-sidebar-safe"><ShieldCheckIcon /><span><b>Защищённая зона</b><small>Доступ к данным пациентов контролируется системой прав.</small></span></div>
+        <div className="doctor-sidebar-foot"><Link href="/"><ArrowLeftIcon /> Кабинет пациента</Link></div>
+      </aside>
+
+      <div className="doctor-main">
+        <header className="doctor-topbar doctor-topbar-v2">
+          <div><b>Рабочий кабинет</b><span>Медицинская зона</span></div>
+          <Link className="account-pill" href="/profile"><span className="account-dot" /> Аккаунт</Link>
+        </header>
+        {children}
+      </div>
+
+      <nav className="doctor-mobile-nav doctor-mobile-nav-v2">
+        {items.map(({ href, label, icon: Icon }) => (
+          <Link className={isActive(pathname, href) ? "active" : ""} key={href} href={href}>
+            <Icon />
+            <span>{label}</span>
+          </Link>
+        ))}
       </nav>
-      <div className="doctor-sidebar-foot"><Link href="/">← Кабинет пациента</Link></div>
-    </aside>
-    <div className="doctor-main">
-      <header className="doctor-topbar"><div><b>Рабочий кабинет</b><span className="muted"> защищённая медицинская зона</span></div><Link className="chip" href="/profile">Аккаунт</Link></header>
-      {children}
     </div>
-    <nav className="doctor-mobile-nav">
-      {items.map(([href,label,icon]) => <Link key={href} href={href}><strong>{icon}</strong>{label}</Link>)}
-    </nav>
-  </div>;
+  );
 }

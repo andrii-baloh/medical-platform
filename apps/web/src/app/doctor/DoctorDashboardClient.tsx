@@ -1,40 +1,65 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CalendarDaysIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { browserApi } from "@/lib/api";
-import { formatDateTime, statusLabel } from "@/lib/format";
+import { statusLabel } from "@/lib/format";
 
 type Dashboard = {
-  doctor:{id:string;fullName:string;initials?:string|null;timezone:string};
-  metrics:{completed_month:number;upcoming:number;patients_total:number};
-  today:Array<{id:string;status:string;reason?:string|null;startsAt:string;endsAt:string;patient:{id:string;fullName:string}}>
+  doctor: { id: string; fullName: string; initials?: string | null; timezone: string };
+  metrics: { completed_month: number; upcoming: number; patients_total: number };
+  today: Array<{ id: string; status: string; reason?: string | null; startsAt: string; endsAt: string; patient: { id: string; fullName: string } }>;
 };
+type ApiError = Error & { status?: number };
 
-export function DoctorDashboardClient(){
-  const [data,setData]=useState<Dashboard|null>(null); const [error,setError]=useState("");
-  const load=()=>browserApi<Dashboard>("/doctor/dashboard").then(setData).catch(e=>setError(e.status===403?"Этот аккаунт не связан с подтверждённым профилем специалиста.":"Не удалось загрузить кабинет."));
-  useEffect(()=>{void load()},[]);
-  if(error) return <main className="doctor-content"><div className="notice error"><b>Доступ к кабинету специалиста</b><p>{error}</p><Link className="btn" href="/login">Войти другим аккаунтом</Link></div></main>;
-  if(!data) return <main className="doctor-content"><div className="card">Загрузка рабочего кабинета…</div></main>;
-  return <main className="doctor-content">
-    <section className="doctor-heading"><div><div className="eyebrow">Сегодня</div><h1>{data.doctor.fullName}</h1><p className="muted">Часовой пояс: {data.doctor.timezone}</p></div><div className="avatar xl">{data.doctor.initials||"MD"}</div></section>
-    <section className="metric-grid">
-      <div className="metric"><span>Предстоящие</span><b>{data.metrics.upcoming}</b></div>
-      <div className="metric"><span>Пациенты</span><b>{data.metrics.patients_total}</b></div>
-      <div className="metric"><span>Завершено в месяце</span><b>{data.metrics.completed_month}</b></div>
-    </section>
-    <div className="section-row"><h2>Приёмы сегодня</h2><Link href="/doctor/calendar">Открыть календарь →</Link></div>
-    <section className="stack">
-      {data.today.length===0 && <div className="card empty">На сегодня записей нет.</div>}
-      {data.today.map(a=><Link className="appointment-row" href={`/doctor/appointments/${a.id}`} key={a.id}>
-        <div className="appointment-time">{new Intl.DateTimeFormat("ru-RU",{hour:"2-digit",minute:"2-digit"}).format(new Date(a.startsAt))}</div>
-        <div className="grow"><b>{a.patient.fullName}</b><div className="muted clamp">{a.reason||"Причина обращения не указана"}</div></div>
-        <span className={`status status-${a.status}`}>{statusLabel(a.status)}</span>
-      </Link>)}
-    </section>
-    <section className="doctor-quick-grid">
-      <Link className="card" href="/doctor/calendar"><b>Управлять расписанием</b><p className="muted">Открывать и закрывать слоты, видеть записи.</p></Link>
-      <Link className="card" href="/doctor/patients"><b>База пациентов</b><p className="muted">История ваших консультаций и разрешённые документы.</p></Link>
-    </section>
-  </main>
+export function DoctorDashboardClient() {
+  const [data, setData] = useState<Dashboard | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    browserApi<Dashboard>("/doctor/dashboard").then(setData).catch((err: ApiError) => {
+      setError(err.status === 403 ? "Этот аккаунт не связан с подтверждённым профилем специалиста." : "Не удалось загрузить кабинет.");
+    });
+  }, []);
+
+  if (error) return <main className="doctor-content"><div className="notice error"><b>Доступ к кабинету специалиста</b><p>{error}</p><Link className="btn" href="/login">Войти другим аккаунтом</Link></div></main>;
+  if (!data) return <main className="doctor-content"><div className="card">Загрузка рабочего кабинета…</div></main>;
+
+  const metrics = [
+    { label: "Предстоящие", value: data.metrics.upcoming, icon: CalendarDaysIcon },
+    { label: "Пациенты", value: data.metrics.patients_total, icon: UserGroupIcon },
+    { label: "Завершено в этом месяце", value: data.metrics.completed_month, icon: CheckCircleIcon },
+  ];
+
+  return (
+    <main className="doctor-content doctor-dashboard-v2">
+      <section className="doctor-heading doctor-heading-v2">
+        <div><span className="eyebrow">Сегодня</span><h1>{data.doctor.fullName}</h1><p>Часовой пояс: {data.doctor.timezone}</p></div>
+        <div className="doctor-profile-badge"><div className="avatar xl">{data.doctor.initials || "MD"}</div><span>Профиль специалиста</span></div>
+      </section>
+
+      <section className="metric-grid metric-grid-v2">
+        {metrics.map(({ label, value, icon: Icon }) => <article className="metric metric-v2" key={label}><div className="metric-icon"><Icon /></div><div><span>{label}</span><b>{value}</b></div></article>)}
+      </section>
+
+      <section className="doctor-section-block">
+        <div className="section-row doctor-section-row"><div><span className="eyebrow">Расписание</span><h2>Приёмы сегодня</h2></div><Link href="/doctor/calendar">Открыть календарь <ChevronRightIcon /></Link></div>
+        <div className="doctor-today-list">
+          {data.today.length === 0 && <div className="card empty-state-modern"><CalendarDaysIcon /><h3>На сегодня записей нет</h3><p>Новые записи появятся здесь автоматически.</p></div>}
+          {data.today.map((appointment) => <Link className="doctor-appointment-card" href={`/doctor/appointments/${appointment.id}`} key={appointment.id}>
+            <div className="doctor-appointment-time"><ClockIcon /><b>{new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(appointment.startsAt))}</b></div>
+            <div className="grow"><h3>{appointment.patient.fullName}</h3><p>{appointment.reason || "Причина обращения не указана"}</p></div>
+            <span className={`status status-${appointment.status}`}>{statusLabel(appointment.status)}</span>
+            <ChevronRightIcon className="doctor-row-arrow" />
+          </Link>)}
+        </div>
+      </section>
+
+      <section className="doctor-quick-grid doctor-quick-grid-v2">
+        <Link className="doctor-quick-card" href="/doctor/calendar"><CalendarDaysIcon /><div><b>Управлять расписанием</b><p>Свободные интервалы, блокировки и записи пациентов.</p></div><ChevronRightIcon /></Link>
+        <Link className="doctor-quick-card" href="/doctor/patients"><UserGroupIcon /><div><b>База пациентов</b><p>История консультаций и доступные документы.</p></div><ChevronRightIcon /></Link>
+      </section>
+    </main>
+  );
 }
