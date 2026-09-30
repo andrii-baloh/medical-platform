@@ -1,4 +1,4 @@
-# MediCare platform 0.10 — patient, doctor, admin, support and outbound-delivery foundation
+# MediCare platform 0.11 — patient, doctor, admin, support and production-hardening foundation
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -18,6 +18,7 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Notifications:** in-app notifications derived from domain outbox events plus leased outbound delivery tracking
 - **Payments:** provider-neutral adapter with development-only provider, webhook reconciliation records, refunds model and patient payment UI
 - **Admin:** API-enforced admin role with operational dashboard, doctor verification, appointments, payments, support queue, outbound delivery journal and audit views without clinical free text
+- **Hardening:** request correlation, audit request IDs, liveness/readiness split, configurable privileged MFA evidence check and per-instance API rate-limit safety net
 - **Country deployment:** isolated country cells instead of one global medical database
 
 See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `docs/DOCTOR_WORKSPACE.md`.
@@ -88,6 +89,16 @@ Uploaded medical files are no longer activated immediately after S3 upload. The 
 `DOCUMENT_SCAN_PROVIDER=development-pass` is intentionally a local-development stub. It emits a warning and does **not** perform malware detection. A production-capable `clamav` adapter is also implemented: it streams the private S3 object to `clamd` using the official `INSTREAM` protocol and never makes the quarantined object public. It still requires real deployment validation, current signature databases, monitoring and country-specific operational controls before handling real patient data.
 
 Migration `006_document_security.sql` quarantines previously active unscanned files instead of silently labeling them clean. Migration `007_document_scan_recovery.sql` adds an index for expired processing leases; the worker can reclaim jobs after a crashed worker and renews active leases during long scans.
+
+## Production-hardening baseline
+
+Every API request receives a validated or generated `x-request-id`. The request ID is propagated through `AsyncLocalStorage`, returned to the client, included automatically in audit records and emitted in request-completion logs together with only method, path, status and duration. Request bodies, query strings, authorization headers, tokens, email addresses and clinical fields are not written by this access logger.
+
+`GET /health/live` is process liveness and does not depend on PostgreSQL. `GET /health/ready` checks database readiness; the legacy `GET /health` remains a backward-compatible readiness endpoint.
+
+When `REQUIRE_PRIVILEGED_MFA=true`, verified OIDC tokens carrying `doctor` or `admin` roles must also contain an accepted `amr` method or configured `acr` value. The local fixture keeps this disabled until its Keycloak authentication flow is configured for MFA. This technical token check is not a substitute for country-specific clinician identity/e-signature requirements.
+
+The API also has a per-process fixed-window safety-net limiter keyed by authenticated subject or, for public endpoints, client IP. Mutating requests use a stricter limit than reads. Health endpoints are exempt. Multi-instance production deployments still require an edge or distributed limiter; the in-process map is deliberately not presented as a cluster-wide control.
 
 ## Local development
 

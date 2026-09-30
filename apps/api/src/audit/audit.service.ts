@@ -1,9 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { DbService } from "../db/db.service";
+import { RequestContextService } from "../common/request-context.service";
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly requestContext: RequestContextService,
+  ) {}
 
   async record(input: {
     actorUserId?: string | null;
@@ -25,7 +29,7 @@ export class AuditService {
         input.resourceType,
         input.resourceId ?? null,
         input.outcome ?? "success",
-        input.requestId ?? null,
+        input.requestId === undefined ? this.requestContext.getRequestId() : input.requestId,
         JSON.stringify(input.metadata ?? {}),
       ],
     );

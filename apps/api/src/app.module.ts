@@ -8,6 +8,7 @@ import { AppointmentsModule } from "./appointments/appointments.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { AuditModule } from "./audit/audit.module";
 import { HealthController } from "./common/health.controller";
+import { RequestContextModule } from "./common/request-context.module";
 import { DoctorWorkspaceModule } from "./doctor-workspace/doctor-workspace.module";
 import { VideoModule } from "./video/video.module";
 import { PatientResultsModule } from "./patient-results/patient-results.module";
@@ -21,6 +22,7 @@ import { validateEnv } from "./config/env";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    RequestContextModule,
     DbModule,
     AuthModule,
     AuditModule,

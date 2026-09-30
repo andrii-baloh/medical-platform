@@ -3,4 +3,6 @@ export interface Principal {
   email?: string;
   name?: string;
   roles: string[];
+  amr: string[];
+  acr?: string;
 }
