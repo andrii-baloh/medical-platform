@@ -15,6 +15,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { OutboxModule } from "./outbox/outbox.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { AdminModule } from "./admin/admin.module";
+import { SupportModule } from "./support/support.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -34,6 +35,7 @@ import { validateEnv } from "./config/env";
     OutboxModule,
     PaymentsModule,
     AdminModule,
+    SupportModule,
   ],
   controllers: [HealthController],
 })

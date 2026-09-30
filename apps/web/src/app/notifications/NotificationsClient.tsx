@@ -10,6 +10,7 @@ type NotificationItem = {
   title: string;
   body: string;
   appointmentId: string | null;
+  payload: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
 };
@@ -64,6 +65,7 @@ export function NotificationsClient() {
             {!item.readAt && <button className="btn small" onClick={() => markRead(item.id)}>Прочитано</button>}
           </div>
           {item.appointmentId && <Link className="back" href={`/consultations/${item.appointmentId}`}>Открыть консультацию →</Link>}
+          {!item.appointmentId && item.type.startsWith("support.") && <Link className="back" href="/support">Открыть поддержку →</Link>}
         </article>
       ))}
       {!items.length && <div className="card empty">Новых уведомлений пока нет.</div>}

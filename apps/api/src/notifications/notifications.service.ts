@@ -10,6 +10,7 @@ type NotificationRow = {
   title: string;
   body: string;
   appointment_id: string | null;
+  payload: Record<string, unknown>;
   read_at: Date | null;
   created_at: Date;
 };
@@ -20,6 +21,7 @@ export type NotificationDto = {
   title: string;
   body: string;
   appointmentId: string | null;
+  payload: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
 };
@@ -31,6 +33,7 @@ function mapNotification(r: NotificationRow): NotificationDto {
     title: r.title,
     body: r.body,
     appointmentId: r.appointment_id ?? null,
+    payload: r.payload ?? {},
     readAt: r.read_at ? new Date(r.read_at).toISOString() : null,
     createdAt: new Date(r.created_at).toISOString(),
   };
@@ -46,7 +49,7 @@ export class NotificationsService {
   async list(principal: Principal): Promise<NotificationDto[]> {
     const user = await this.users.ensureAccount(principal);
     const { rows } = await this.db.query<NotificationRow>(
-      `select id,type,title,body,appointment_id,read_at,created_at
+      `select id,type,title,body,appointment_id,payload,read_at,created_at
        from notifications where user_id=$1 order by created_at desc limit 100`,
       [user.id],
     );

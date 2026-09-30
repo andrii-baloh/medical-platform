@@ -206,6 +206,35 @@ export class AdminService {
     }));
   }
 
+  async listNotificationDeliveries(principal: Principal) {
+    await this.requireAdmin(principal);
+    const { rows } = await this.db.query(
+      `select d.id,d.notification_id,d.channel,d.status,d.provider,d.provider_message_id,
+              d.attempts,d.sent_at,d.last_error_code,d.created_at,d.updated_at,
+              n.type notification_type,u.email::text user_email
+       from notification_deliveries d
+       join notifications n on n.id=d.notification_id
+       join app_users u on u.id=d.user_id
+       order by d.created_at desc
+       limit 250`,
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      notificationId: row.notification_id,
+      notificationType: row.notification_type,
+      channel: row.channel,
+      status: row.status,
+      provider: row.provider,
+      providerMessageId: row.provider_message_id,
+      attempts: row.attempts,
+      userEmail: row.user_email,
+      sentAt: row.sent_at ? new Date(row.sent_at).toISOString() : null,
+      lastErrorCode: row.last_error_code,
+      createdAt: new Date(row.created_at).toISOString(),
+      updatedAt: new Date(row.updated_at).toISOString(),
+    }));
+  }
+
   async listAudit(principal: Principal, query?: string) {
     await this.requireAdmin(principal);
     const q = (query ?? "").trim();

@@ -1,4 +1,4 @@
-# MediCare platform 0.9 — patient, doctor and admin platform with document quarantine pipeline
+# MediCare platform 0.10 — patient, doctor, admin, support and outbound-delivery foundation
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -15,9 +15,9 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Clinical records:** mutable draft + immutable signed version snapshots with hash chaining
 - **Reliability:** transactional booking, idempotency keys and leased transactional outbox processing
 - **Video:** provider-neutral adapter; local development is configured for self-hosted LiveKit
-- **Notifications:** in-app notifications derived from domain outbox events with deduplication
+- **Notifications:** in-app notifications derived from domain outbox events plus leased outbound delivery tracking
 - **Payments:** provider-neutral adapter with development-only provider, webhook reconciliation records, refunds model and patient payment UI
-- **Admin:** API-enforced admin role with operational dashboard, doctor verification, appointments, payments and audit views without clinical free text
+- **Admin:** API-enforced admin role with operational dashboard, doctor verification, appointments, payments, support queue, outbound delivery journal and audit views without clinical free text
 - **Country deployment:** isolated country cells instead of one global medical database
 
 See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `docs/DOCTOR_WORKSPACE.md`.
@@ -36,7 +36,8 @@ See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `do
 - in-app notifications with unread count and read/read-all actions;
 - payment-session creation from booking/consultation UI, payment status display and development-mode payment adapter;
 - unified responsive patient UI for home, doctor discovery/profile, booking, consultations, documents, notifications, profile and login;
-- desktop navigation plus mobile bottom navigation with consistent patient design system.
+- desktop navigation plus mobile bottom navigation with consistent patient design system;
+- patient support center for account, appointment, payment and technical issues with threaded replies.
 
 ## Implemented doctor workspace
 
@@ -71,10 +72,14 @@ Routes under `/doctor` now provide:
 - doctor verification/publication controls;
 - admin appointment and payment tables;
 - searchable audit trail;
+- support queue with threaded user/admin replies, status and priority controls;
+- outbound notification-delivery journal for operational troubleshooting;
 - admin API authorization requires both verified OIDC `admin` role and persisted `user_roles` membership;
 - admin screens intentionally do not expose consultation complaints, anamnesis, assessment or recommendations.
 
 The current payment adapter is for development only. A launch country still requires a real regulated payment provider implementation and provider-specific webhook verification.
+
+Outbound email delivery now has a leased/retryable delivery queue and provider-neutral interface. `NOTIFICATION_EMAIL_PROVIDER=development` only simulates delivery and does not contact an external mail service; production still requires a real provider adapter.
 
 ## Document quarantine and scanning
 
@@ -193,10 +198,24 @@ GET   /v1/admin/doctors/:id
 PATCH /v1/admin/doctors/:id
 GET   /v1/admin/appointments
 GET   /v1/admin/payments
+GET   /v1/admin/notification-deliveries
+GET   /v1/admin/support
+GET   /v1/admin/support/:id
+POST  /v1/admin/support/:id/messages
+PATCH /v1/admin/support/:id
 GET   /v1/admin/audit
 ```
 
 The development webhook endpoint is only for the local development adapter and must not be treated as a production payment integration.
+
+User support API:
+
+```text
+GET  /v1/support
+POST /v1/support
+GET  /v1/support/:id
+POST /v1/support/:id/messages
+```
 
 ## Quick visual review
 
@@ -210,7 +229,7 @@ The repository is an engineering implementation, not a claim of medical/legal co
 - legally appropriate clinician identity and electronic-signature method;
 - production LiveKit deployment/provider selection, credentials, TURN/network validation and operational monitoring;
 - real launch-country payment provider, production webhook signature verification, settlement reconciliation and payout operations;
-- outbound notification providers and delivery tracking for email/SMS/push;
+- real outbound email provider implementation and any launch-required SMS/push channels;
 - production validation/monitoring of the implemented ClamAV quarantine pipeline, including signature update operations and capacity testing;
 - backup/restore automation and tested disaster recovery;
 - KMS/envelope encryption where required;

@@ -42,6 +42,11 @@ export class AdminController {
     return this.admin.listPayments(principal);
   }
 
+  @Get("notification-deliveries")
+  listNotificationDeliveries(@CurrentPrincipal() principal: Principal) {
+    return this.admin.listNotificationDeliveries(principal);
+  }
+
   @Get("audit")
   listAudit(@CurrentPrincipal() principal: Principal, @Query("q") query?: string) {
     return this.admin.listAudit(principal, query);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRightOnRectangleIcon, ClockIcon, EnvelopeIcon, UserGroupIcon, UserIcon } from "@heroicons/react/24/outline";
+import { ArrowRightOnRectangleIcon, ChatBubbleLeftRightIcon, ClockIcon, EnvelopeIcon, UserGroupIcon, UserIcon } from "@heroicons/react/24/outline";
 import { browserApi } from "@/lib/api";
 
 type Me = {
@@ -54,6 +54,7 @@ export function ProfileClient() {
 
       <section className="profile-actions-card card">
         {me.roles.includes("doctor") && <a className="btn primary" href="/doctor">Открыть кабинет специалиста</a>}
+        <a className="btn" href="/support"><ChatBubbleLeftRightIcon /> Поддержка</a>
         <a className="btn danger" href="/api/auth/signout"><ArrowRightOnRectangleIcon /> Выйти из аккаунта</a>
       </section>
     </div>

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDaysIcon,
+  ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
   CreditCardIcon,
+  EnvelopeIcon,
   HomeIcon,
   ShieldCheckIcon,
   UserGroupIcon,
@@ -17,6 +19,8 @@ const items = [
   { href: "/admin/doctors", label: "Врачи", icon: UserGroupIcon },
   { href: "/admin/appointments", label: "Записи", icon: CalendarDaysIcon },
   { href: "/admin/payments", label: "Платежи", icon: CreditCardIcon },
+  { href: "/admin/support", label: "Поддержка", icon: ChatBubbleLeftRightIcon },
+  { href: "/admin/notifications", label: "Доставка", icon: EnvelopeIcon },
   { href: "/admin/audit", label: "Аудит", icon: ClipboardDocumentListIcon },
 ] as const;
 
