@@ -1,4 +1,4 @@
-# MediCare platform 0.8 — patient, doctor and admin workspaces with payment foundation
+# MediCare platform 0.9 — patient, doctor and admin platform with document quarantine pipeline
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -9,6 +9,7 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Identity:** OIDC/OAuth2; local development uses Keycloak
 - **Database:** PostgreSQL 17
 - **Medical files:** private S3-compatible object storage; local development uses MinIO
+- **Document security:** server-side signature/checksum verification, quarantine state and provider-neutral scan worker before files become active
 - **Authorization:** API-side role + relationship + ownership checks
 - **Audit:** append-only `audit_events` plus appointment state history
 - **Clinical records:** mutable draft + immutable signed version snapshots with hash chaining
@@ -27,7 +28,8 @@ See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `do
 - authenticated patient/family profiles;
 - atomic appointment booking and patient cancellation;
 - private document upload/download through signed S3 URLs;
-- explicit grant/revoke of one document to one connected doctor;
+- uploaded PDF/JPEG/PNG/WebP files are server-verified by magic bytes and authoritative SHA-256, quarantined, then released only after scan verdict;
+- explicit grant/revoke of one active document to one connected doctor;
 - patient consultation list and appointment detail UI;
 - LiveKit video join through short-lived server-issued tokens;
 - read-only access to immutable signed consultation results and version history;
@@ -73,6 +75,14 @@ Routes under `/doctor` now provide:
 - admin screens intentionally do not expose consultation complaints, anamnesis, assessment or recommendations.
 
 The current payment adapter is for development only. A launch country still requires a real regulated payment provider implementation and provider-specific webhook verification.
+
+## Document quarantine and scanning
+
+Uploaded medical files are no longer activated immediately after S3 upload. The API verifies declared size/content type, inspects file signatures for the allowed formats, computes the authoritative SHA-256 itself, and moves the document to `quarantined`. A leased `document_scan_jobs` worker then obtains a verdict through the provider-neutral `DocumentScannerProvider` interface. Only a `clean` verdict changes the document to `active`; infected/error files remain unavailable for download and sharing.
+
+`DOCUMENT_SCAN_PROVIDER=development-pass` is intentionally a local-development stub. It emits a warning and does **not** perform malware detection. It must be replaced with a real scanner before staging/production use; its existence is not a security or compliance claim.
+
+Migration `006_document_security.sql` also quarantines previously active unscanned files instead of silently labeling them clean.
 
 ## Local development
 

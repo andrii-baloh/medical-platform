@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsMimeType, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { IsIn, IsInt, IsMimeType, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from "class-validator";
 
 const categories = ["analysis","discharge","conclusion","prescription","image","other"] as const;
 
@@ -25,7 +25,7 @@ export class CreateUploadIntentDto {
 export class CompleteUploadDto {
   @IsOptional()
   @IsString()
-  @MaxLength(64)
+  @Matches(/^[a-fA-F0-9]{64}$/)
   sha256Hex?: string;
 }
 

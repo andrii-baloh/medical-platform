@@ -1,73 +1,63 @@
-# Foundation status 0.8
+# Foundation status 0.9
 
 ## Completed in code
 
 - provider-neutral web/API/database/storage architecture
-- OIDC bearer-token verification at the API boundary
-- trusted role synchronization from verified identity claims
-- PostgreSQL domain model and versioned migrations
-- transactional booking + idempotency + leased outbox processing
-- patient ownership and doctor relationship authorization
-- private S3 medical documents and explicit document grants
-- audit event trail and appointment state history
-- unified responsive patient and doctor workspaces
-- consultation draft lifecycle and immutable signed version history
-- SHA-256 version hash chaining and amendment workflow
-- patient read-only access to signed consultation versions
-- provider-neutral video abstraction with LiveKit adapter
-- backend-enforced video role, relationship, status and join window
-- short-lived video tokens that are not persisted
-- patient and doctor LiveKit UI with camera/microphone controls
-- in-app notifications with unread/read/read-all UI and API
-- payment-status notifications generated from the transactional outbox
-- provider-neutral payment interface
-- development-only payment adapter that does not move money or process card data
-- payment session records and provider/session identifiers
-- webhook event deduplication and payment status reconciliation
-- refund request records with refundable-amount protection
-- patient payment actions on booking success and consultation detail
-- admin dashboard and responsive admin shell
-- admin doctor verification/publication controls
-- admin appointment and payment operational tables
-- searchable audit trail
-- admin API authorization requiring both OIDC admin role and persisted admin membership
-- admin views intentionally exclude clinical free text
-- local LiveKit Docker configuration
-- migration 005 for payment reconciliation/refund structures
+- OIDC bearer-token verification and persisted role checks
+- patient, doctor and admin workspaces
+- transactional booking, idempotency and leased outbox processing
+- private S3 medical documents and explicit doctor grants
+- consultation draft lifecycle + immutable signed SHA-256 version chain
+- provider-neutral LiveKit video adapter and patient/doctor video UI
+- in-app notifications and generic payment-status notifications
+- provider-neutral payment interface, development provider, webhook event dedupe and refund records
+- admin dashboard, doctor verification/publication, appointments, payments and audit views
+- migration 005 for payment/admin reconciliation structures
+- migration 006 for document-security metadata and leased scan jobs
+- server-side file-size/content-type checks
+- PDF/JPEG/PNG/WebP magic-byte verification
+- authoritative server-side SHA-256 verification after upload
+- quarantine-before-activation document lifecycle
+- provider-neutral `DocumentScannerProvider`
+- leased, retryable multi-worker-safe document scan worker
+- infected/error files remain quarantined and cannot be downloaded or shared
+- existing pre-scan active files are quarantined by migration 006 instead of being silently declared clean
+- patient document UI exposes Проверяется / Проверен / Заблокирован / Ошибка проверки states
+
+## Important development limitation
+
+`DOCUMENT_SCAN_PROVIDER=development-pass` is a local-development stub only. It does not detect malware. It exists so the quarantine workflow can be exercised without pretending that antivirus protection is present. A real scanner must replace it before staging/production.
+
+The development payment provider likewise does not move real money or process card data.
 
 ## Validated locally
 
-- API TypeScript typecheck passes
-- Web TypeScript typecheck passes
-- patient UI milestone 0.6 production build passed
-- doctor UI milestone 0.7 production build passed
-- current 0.8 root TypeScript typecheck passes
-- current 0.8 root production build passes, including all patient/doctor/admin routes
-- after the final payment concurrency/status hardening, API typecheck and API production build pass again
+- API TypeScript typecheck passes after document-security implementation
+- Web TypeScript typecheck passes after document-security UI changes
+- previous 0.8 root production build passed with all patient/doctor/admin routes
+- current 0.9 production build is used to validate the complete milestone before commit
 
 ## Not runtime-validated on this computer
 
-Docker is not installed and PostgreSQL is not currently reachable. Therefore the following are not claimed as verified:
+Docker is not installed and PostgreSQL is not reachable. Therefore these are not claimed as verified:
 
-- executing migrations `003_video_notifications.sql`, `004_outbox_claiming.sql` and `005_payments_admin.sql` against PostgreSQL
-- starting the local PostgreSQL/Keycloak/MinIO/LiveKit Docker stack
-- real two-party patient ↔ doctor WebRTC session through LiveKit
-- full end-to-end booking → payment event → video → signed result → notification flow
-- payment webhook processing against a running PostgreSQL instance
+- executing migrations 003–006 against PostgreSQL
+- starting PostgreSQL/Keycloak/MinIO/LiveKit through Docker
+- real two-party patient ↔ doctor WebRTC
+- real document scan against an antivirus engine
+- full booking → payment → upload/quarantine → video → signed result → notification E2E flow
 
-## Intentionally not declared production-complete
+## Still required for production
 
-- real launch-country payment provider and settlement/payout integration
-- provider-specific production webhook signature verification using raw request payloads where required
-- real doctor credential/licensing verification operations
-- country-specific clinician e-signature / legal document signing
-- outbound email/SMS/push delivery providers
-- antivirus/document quarantine worker
+- real malware scanner / quarantine service integration
+- launch-country payment provider and settlement/payout integration
+- production webhook signature verification requirements for that provider
+- real clinician licensing/onboarding operations
+- country-specific clinician e-signature method
+- outbound email/SMS/push providers and delivery tracking
 - backup/restore automation and tested disaster recovery
-- KMS/envelope encryption integration
-- observability/alerting
+- KMS/envelope encryption where required
+- observability and alerting
 - production CI/CD and security scanning
-- production MFA enforcement for doctor/admin accounts
-- country-specific retention, consent and telemedicine configuration
-
-The next product milestone after 0.8 is production hardening plus the remaining operational modules such as support, outbound notifications and real payment-provider selection for the first launch country.
+- MFA enforcement for doctor/admin
+- country-specific retention, consent, telemedicine and data-residency configuration

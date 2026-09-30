@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { HeadObjectCommand, PutObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import { AuditService } from "../audit/audit.service";
@@ -66,7 +66,7 @@ export class DocumentsService {
 
   async complete(principal: Principal, documentId: string, input: CompleteUploadDto) {
     const user = await this.users.ensureAccount(principal);
-    const { rows } = await this.db.query(
+    const { rows } = await this.db.query<MedicalDocumentRow>(
       `select d.* from medical_documents d
        join patient_profiles p on p.id=d.patient_profile_id
        where d.id=$1 and p.owner_user_id=$2 and d.status='uploading'`,
@@ -74,19 +74,73 @@ export class DocumentsService {
     );
     const doc = rows[0];
     if (!doc) throw new NotFoundException("Upload not found");
+
     const head = await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: doc.storage_key }));
     if (Number(head.ContentLength ?? -1) !== Number(doc.size_bytes)) {
+      await this.quarantineIntegrityFailure(documentId, "size_mismatch");
       throw new UnprocessableEntityException("Uploaded size does not match declared size");
     }
     if (head.ContentType && head.ContentType !== doc.mime_type) {
+      await this.quarantineIntegrityFailure(documentId, "content_type_mismatch");
       throw new UnprocessableEntityException("Uploaded content type does not match declared type");
     }
-    const { rows: updated } = await this.db.query(
-      `update medical_documents set status='active',activated_at=now(),sha256_hex=$2 where id=$1 returning *`,
-      [documentId, input.sha256Hex ?? null],
+
+    const object = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: doc.storage_key }));
+    if (!object.Body) {
+      await this.quarantineIntegrityFailure(documentId, "object_body_missing");
+      throw new UnprocessableEntityException("Uploaded object cannot be inspected");
+    }
+    const bytes = await object.Body.transformToByteArray();
+    const detectedMimeType = detectMimeType(bytes);
+    if (!detectedMimeType || detectedMimeType !== doc.mime_type) {
+      await this.quarantineIntegrityFailure(documentId, "magic_bytes_mismatch", detectedMimeType ?? null);
+      throw new UnprocessableEntityException("Uploaded file signature does not match declared type");
+    }
+
+    const authoritativeSha256 = createHash("sha256").update(bytes).digest("hex");
+    if (input.sha256Hex && input.sha256Hex.toLowerCase() !== authoritativeSha256) {
+      await this.quarantineIntegrityFailure(documentId, "sha256_mismatch", detectedMimeType);
+      throw new UnprocessableEntityException("Uploaded checksum does not match");
+    }
+
+    const updated = await this.db.tx(async (client) => {
+      const result = await client.query<MedicalDocumentRow>(
+        `update medical_documents
+         set status='quarantined',activated_at=null,sha256_hex=$2,detected_mime_type=$3,
+             scan_status='pending',scan_provider=null,scan_completed_at=null,scan_error_code=null
+         where id=$1 returning *`,
+        [documentId, authoritativeSha256, detectedMimeType],
+      );
+      await client.query(
+        `insert into document_scan_jobs(document_id,status,attempts,updated_at)
+         values ($1,'pending',0,now())
+         on conflict (document_id) do update
+         set status='pending',attempts=0,claimed_at=null,claimed_by=null,claim_expires_at=null,
+             completed_at=null,last_error_code=null,updated_at=now()`,
+        [documentId],
+      );
+      return result.rows[0];
+    });
+
+    await this.audit.record({
+      actorUserId: user.id,
+      actorSubject: principal.sub,
+      action: "document.upload.quarantine",
+      resourceType: "medical_document",
+      resourceId: documentId,
+      metadata: { detectedMimeType, scanStatus: "pending" },
+    });
+    return mapDocument(updated);
+  }
+
+  private async quarantineIntegrityFailure(documentId: string, errorCode: string, detectedMimeType: string | null = null) {
+    await this.db.query(
+      `update medical_documents
+       set status='quarantined',scan_status='error',detected_mime_type=coalesce($3,detected_mime_type),
+           scan_error_code=$2,scan_completed_at=null
+       where id=$1`,
+      [documentId, errorCode, detectedMimeType],
     );
-    await this.audit.record({ actorUserId: user.id, actorSubject: principal.sub, action: "document.upload.complete", resourceType: "medical_document", resourceId: documentId });
-    return mapDocument(updated[0]);
   }
 
   async downloadUrl(principal: Principal, documentId: string) {
@@ -150,15 +204,48 @@ export class DocumentsService {
   }
 }
 
-function mapDocument(r: any) {
+type MedicalDocumentRow = {
+  id: string;
+  patient_profile_id: string;
+  storage_key: string;
+  original_name: string;
+  mime_type: string;
+  detected_mime_type: string | null;
+  size_bytes: string | number;
+  sha256_hex: string | null;
+  category: string;
+  status: string;
+  scan_status: string;
+  scan_provider: string | null;
+  scan_completed_at: Date | null;
+  created_at: Date;
+};
+
+function mapDocument(r: MedicalDocumentRow) {
   return {
     id: r.id,
     patientProfileId: r.patient_profile_id,
     originalName: r.original_name,
     mimeType: r.mime_type,
+    detectedMimeType: r.detected_mime_type,
     sizeBytes: Number(r.size_bytes),
     category: r.category,
     status: r.status,
+    scanStatus: r.scan_status,
+    scanProvider: r.scan_provider,
+    scanCompletedAt: r.scan_completed_at ? new Date(r.scan_completed_at).toISOString() : null,
     createdAt: new Date(r.created_at).toISOString(),
   };
+}
+
+function detectMimeType(bytes: Uint8Array): string | null {
+  const starts = (...signature: number[]) => signature.every((value, index) => bytes[index] === value);
+  if (starts(0x25, 0x50, 0x44, 0x46, 0x2d)) return "application/pdf";
+  if (starts(0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
+  if (
+    starts(0x52, 0x49, 0x46, 0x46) &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) return "image/webp";
+  return null;
 }
