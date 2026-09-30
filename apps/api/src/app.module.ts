@@ -13,6 +13,8 @@ import { VideoModule } from "./video/video.module";
 import { PatientResultsModule } from "./patient-results/patient-results.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { OutboxModule } from "./outbox/outbox.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { AdminModule } from "./admin/admin.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -30,6 +32,8 @@ import { validateEnv } from "./config/env";
     PatientResultsModule,
     NotificationsModule,
     OutboxModule,
+    PaymentsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

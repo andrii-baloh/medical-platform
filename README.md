@@ -1,4 +1,4 @@
-# MediCare platform 0.7 — unified patient + doctor UI with video consultations and signed results
+# MediCare platform 0.8 — patient, doctor and admin workspaces with payment foundation
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -15,6 +15,8 @@ This repository is the provider-neutral foundation for a multi-country online me
 - **Reliability:** transactional booking, idempotency keys and leased transactional outbox processing
 - **Video:** provider-neutral adapter; local development is configured for self-hosted LiveKit
 - **Notifications:** in-app notifications derived from domain outbox events with deduplication
+- **Payments:** provider-neutral adapter with development-only provider, webhook reconciliation records, refunds model and patient payment UI
+- **Admin:** API-enforced admin role with operational dashboard, doctor verification, appointments, payments and audit views without clinical free text
 - **Country deployment:** isolated country cells instead of one global medical database
 
 See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `docs/DOCTOR_WORKSPACE.md`.
@@ -30,6 +32,7 @@ See `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATA_RESIDENCY.md` and `do
 - LiveKit video join through short-lived server-issued tokens;
 - read-only access to immutable signed consultation results and version history;
 - in-app notifications with unread count and read/read-all actions;
+- payment-session creation from booking/consultation UI, payment status display and development-mode payment adapter;
 - unified responsive patient UI for home, doctor discovery/profile, booking, consultations, documents, notifications, profile and login;
 - desktop navigation plus mobile bottom navigation with consistent patient design system.
 
@@ -52,6 +55,24 @@ Routes under `/doctor` now provide:
 - unified responsive doctor UI aligned with the patient design system across dashboard, calendar, patient list/card, consultation workspace and profile.
 
 `consultation_versions` has a PostgreSQL trigger that rejects update/delete operations.
+
+## Implemented payments and admin foundation
+
+- provider-neutral `PaymentProvider` interface;
+- development-only payment adapter that never processes card data or moves money;
+- payment session records, provider/session identifiers and webhook event deduplication;
+- payment status reconciliation into the transactional outbox;
+- refund request records with refundable-amount protection;
+- patient payment actions on booking success and consultation detail;
+- generic payment-status notifications without medical text;
+- admin dashboard with aggregate operational metrics;
+- doctor verification/publication controls;
+- admin appointment and payment tables;
+- searchable audit trail;
+- admin API authorization requires both verified OIDC `admin` role and persisted `user_roles` membership;
+- admin screens intentionally do not expose consultation complaints, anamnesis, assessment or recommendations.
+
+The current payment adapter is for development only. A launch country still requires a real regulated payment provider implementation and provider-specific webhook verification.
 
 ## Local development
 
@@ -147,6 +168,25 @@ POST /v1/notifications/read-all
 
 Video access is checked on the backend for ownership/doctor relationship, appointment state and time window. Raw video tokens are never persisted. Patient result endpoints read only immutable signed `consultation_versions`; mutable drafts are never exposed.
 
+## Payments and admin API
+
+```text
+POST /v1/payments/appointments/:appointmentId/session
+GET  /v1/payments/appointments/:appointmentId
+POST /v1/payments/:paymentId/refunds
+POST /v1/payments/webhooks/development
+
+GET   /v1/admin/dashboard
+GET   /v1/admin/doctors
+GET   /v1/admin/doctors/:id
+PATCH /v1/admin/doctors/:id
+GET   /v1/admin/appointments
+GET   /v1/admin/payments
+GET   /v1/admin/audit
+```
+
+The development webhook endpoint is only for the local development adapter and must not be treated as a production payment integration.
+
 ## Quick visual review
 
 Open `doctor-preview.html` directly in a browser. It is a self-contained interactive visual preview and does not connect to the database. The actual Next.js doctor pages use the API endpoints above.
@@ -155,10 +195,10 @@ Open `doctor-preview.html` directly in a browser. It is a self-contained interac
 
 The repository is an engineering implementation, not a claim of medical/legal compliance. Before real patients are processed in a specific country, the following still need country-specific implementation and validation:
 
-- admin verification/onboarding for real medical professionals;
+- real-world doctor onboarding evidence, licensing checks and operational verification workflow;
 - legally appropriate clinician identity and electronic-signature method;
 - production LiveKit deployment/provider selection, credentials, TURN/network validation and operational monitoring;
-- payment provider + webhook reconciliation;
+- real launch-country payment provider, production webhook signature verification, settlement reconciliation and payout operations;
 - outbound notification providers and delivery tracking for email/SMS/push;
 - malware scanning/quarantine pipeline for uploaded files;
 - backup/restore automation and tested disaster recovery;

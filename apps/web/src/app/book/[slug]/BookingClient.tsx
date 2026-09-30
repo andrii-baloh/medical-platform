@@ -7,6 +7,7 @@ import { browserApi } from "@/lib/api";
 type Slot = { id: string; doctorId: string; startsAt: string; endsAt: string; price: { amountMinor: number; currency: string } };
 type Me = { timezone: string; patientProfiles: { id: string; fullName: string }[] };
 type BookingResult = { id: string; status: string; startsAt: string; endsAt: string; price: { amountMinor: number; currency: string } };
+type Payment = { id: string; provider: string; status: string; checkoutUrl: string | null; amountMinor: number; currency: string };
 type ApiError = Error & { status?: number };
 
 export function BookingClient({ slug }: { slug: string }) {
@@ -17,6 +18,8 @@ export function BookingClient({ slug }: { slug: string }) {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payment, setPayment] = useState<Payment | null>(null);
   const [needLogin, setNeedLogin] = useState(false);
   const [success, setSuccess] = useState<BookingResult | null>(null);
 
@@ -66,6 +69,21 @@ export function BookingClient({ slug }: { slug: string }) {
     }
   }
 
+  async function pay() {
+    if (!success) return;
+    setPayBusy(true);
+    setMessage("");
+    try {
+      const created = await browserApi<Payment>(`/payments/appointments/${success.id}/session`, { method: "POST", body: "{}" });
+      setPayment(created);
+      if (created.checkoutUrl) window.location.assign(created.checkoutUrl);
+    } catch {
+      setMessage("Запись создана, но платёжную сессию открыть не удалось.");
+    } finally {
+      setPayBusy(false);
+    }
+  }
+
   if (needLogin) return <div className="card booking-login"><h2>Войдите в аккаунт</h2><p>Для записи на консультацию нужен защищённый профиль пациента.</p><a className="btn primary" href="/login">Войти</a></div>;
 
   if (success && me) {
@@ -75,7 +93,11 @@ export function BookingClient({ slug }: { slug: string }) {
         <span className="eyebrow">Запись подтверждена</span>
         <h2>Консультация добавлена в ваш кабинет</h2>
         <p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: me.timezone }).format(new Date(success.startsAt))}</p>
-        <div className="row wrap"><a className="btn primary" href={`/consultations/${success.id}`}>Открыть консультацию</a><a className="btn" href="/consultations">Все приёмы</a></div>
+        {!payment && <button className="btn primary" disabled={payBusy} onClick={pay}>{payBusy ? "Подготовка оплаты…" : "Перейти к оплате"}</button>}
+        {payment?.checkoutUrl && <a className="btn primary" href={payment.checkoutUrl}>Открыть страницу оплаты</a>}
+        {payment?.provider === "development" && <div className="notice">Платёжная сессия создана в тестовом режиме. Реального списания денег нет.</div>}
+        {message && <div className="notice error">{message}</div>}
+        <div className="row wrap"><a className="btn" href={`/consultations/${success.id}`}>Открыть консультацию</a><a className="btn" href="/consultations">Все приёмы</a></div>
       </div>
     );
   }

@@ -24,6 +24,8 @@ const schema = z.object({
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(10),
   OUTBOX_CLAIM_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(120),
+  PAYMENT_PROVIDER: z.enum(["development"]).default("development"),
+  PAYMENT_DEV_WEBHOOK_SECRET: z.string().min(12).optional(),
   LIVEKIT_URL: z.string().min(1).optional(),
   LIVEKIT_PUBLIC_URL: z.string().min(1).optional(),
   LIVEKIT_API_KEY: z.string().min(1).optional(),

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, CreditCardIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { browserApi } from "@/lib/api";
 
@@ -30,6 +30,19 @@ type SignedResult = {
   recommendations: string;
   contentSha256: string;
   previousVersionSha256: string | null;
+};
+
+type Payment = {
+  id: string;
+  appointmentId: string;
+  provider: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+  checkoutUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
 };
 
 const statusLabels: Record<string, string> = {
@@ -72,6 +85,8 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [result, setResult] = useState<SignedResult | null>(null);
   const [versions, setVersions] = useState<SignedResult[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -82,8 +97,12 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
         const appt = await browserApi<Appointment>(`/appointments/${appointmentId}`);
         if (!active) return;
         setAppointment(appt);
-        const latest = await browserApi<SignedResult>(`/appointments/${appointmentId}/result`).catch(() => null);
+        const [latest, loadedPayments] = await Promise.all([
+          browserApi<SignedResult>(`/appointments/${appointmentId}/result`).catch(() => null),
+          browserApi<Payment[]>(`/payments/appointments/${appointmentId}`).catch(() => []),
+        ]);
         if (!active) return;
+        setPayments(loadedPayments);
         setResult(latest);
         if (latest) {
           const all = await browserApi<SignedResult[]>(`/appointments/${appointmentId}/result/versions`).catch(() => []);
@@ -98,8 +117,23 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
     return () => { active = false; };
   }, [appointmentId]);
 
+  async function createPaymentSession() {
+    setPaymentBusy(true);
+    setMessage("");
+    try {
+      const payment = await browserApi<Payment>(`/payments/appointments/${appointmentId}/session`, { method: "POST", body: "{}" });
+      setPayments((current) => [payment, ...current.filter((item) => item.id !== payment.id)]);
+      if (payment.checkoutUrl) window.location.assign(payment.checkoutUrl);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось создать платёжную сессию.");
+    } finally {
+      setPaymentBusy(false);
+    }
+  }
+
   if (loading) return <div className="card">Загрузка консультации…</div>;
   if (!appointment) return <div className="notice error">{message || "Консультация не найдена."}</div>;
+  const activePayment = payments.find((item) => ["created", "authorized", "paid", "partially_refunded"].includes(item.status)) ?? payments[0] ?? null;
 
   return (
     <div className="consultation-detail-modern">
@@ -112,6 +146,18 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
       </section>
 
       <section className="card consultation-reason-card"><span className="eyebrow">Причина обращения</span><p>{appointment.reason || "Не указана"}</p></section>
+
+      <section className="card payment-card-patient">
+        <div className="payment-card-icon"><CreditCardIcon /></div>
+        <div className="grow">
+          <span className="eyebrow">Оплата</span>
+          <h3>{activePayment ? `Статус: ${activePayment.status}` : "Платёж ещё не создан"}</h3>
+          <p>{new Intl.NumberFormat("ru-RU", { style: "currency", currency: appointment.price.currency }).format(appointment.price.amountMinor / 100)} · платёж обрабатывается через внешний провайдер, карточные данные MediCare не хранит.</p>
+        </div>
+        {activePayment?.checkoutUrl ? <a className="btn primary" href={activePayment.checkoutUrl}>Перейти к оплате</a> : activePayment?.status === "paid" ? <span className="signed-badge">Оплачено</span> : activePayment?.provider === "development" ? <span className="payment-dev-badge">Тестовый платёж</span> : <button className="btn primary" disabled={paymentBusy} onClick={createPaymentSession}>{paymentBusy ? "Подготовка…" : activePayment ? "Повторить" : "Перейти к оплате"}</button>}
+      </section>
+
+      {message && <div className="notice error">{message}</div>}
 
       {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />}
 

@@ -270,6 +270,30 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
         break;
       }
 
+      case "payment.status_changed": {
+        const status = typeof event.payload.status === "string" ? event.payload.status : "unknown";
+        const paymentId = typeof event.payload.paymentId === "string" ? event.payload.paymentId : event.aggregate_id ?? "unknown";
+        const copy: Record<string, { title: string; body: string }> = {
+          paid: { title: "Оплата подтверждена", body: "Оплата консультации успешно подтверждена." },
+          failed: { title: "Оплата не прошла", body: "Платёж не был подтверждён. Проверьте статус консультации и способ оплаты." },
+          refunded: { title: "Возврат выполнен", body: "Возврат оплаты по консультации завершён." },
+          partially_refunded: { title: "Частичный возврат", body: "По оплате консультации выполнен частичный возврат." },
+        };
+        const message = copy[status];
+        if (message) {
+          intents.push({
+            ...base,
+            userId: appt.patient_user_id,
+            type: event.event_type,
+            title: message.title,
+            body: message.body,
+            dedupeKey: `payment-status:${event.id}`,
+            payload: { appointmentId, paymentId, status },
+          });
+        }
+        break;
+      }
+
       case "appointment.completed":
         // Reserved for a future patient-facing completion notice.
         break;
