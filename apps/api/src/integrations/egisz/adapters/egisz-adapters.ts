@@ -24,8 +24,14 @@ export type RemdSubmissionInput = {
   medicalDocumentVersionId: string;
 };
 
+export type RemdStatusInput = {
+  medicalDocumentVersionId: string;
+  externalId?: string;
+};
+
 export interface REMDAdapter {
   submitDocument(input: RemdSubmissionInput): Promise<EgiszAdapterResult>;
+  checkRegistration(input: RemdStatusInput): Promise<EgiszAdapterResult>;
 }
 
 export type PatientIntegrationInput = {

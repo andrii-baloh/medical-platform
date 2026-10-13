@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ArrowLeftIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
+  CloudArrowUpIcon,
   CreditCardIcon,
   EnvelopeIcon,
   HomeIcon,
   ShieldCheckIcon,
   UserGroupIcon,
-  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 
 const items = [
@@ -19,6 +20,7 @@ const items = [
   { href: "/admin/doctors", label: "Врачи", icon: UserGroupIcon },
   { href: "/admin/appointments", label: "Записи", icon: CalendarDaysIcon },
   { href: "/admin/payments", label: "Платежи", icon: CreditCardIcon },
+  { href: "/admin/integrations/remd", label: "РЭМД", icon: CloudArrowUpIcon },
   { href: "/admin/support", label: "Поддержка", icon: ChatBubbleLeftRightIcon },
   { href: "/admin/notifications", label: "Доставка", icon: EnvelopeIcon },
   { href: "/admin/audit", label: "Аудит", icon: ClipboardDocumentListIcon },

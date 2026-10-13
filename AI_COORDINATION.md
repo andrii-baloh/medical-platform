@@ -71,3 +71,15 @@ Stage 11 adds a separate `integrations/egisz` boundary and migration `023_egisz_
 No fake production EGISZ success path is allowed. A real EGISZ/REMD transport adapter must only be wired when the selected integration contract, endpoint, credentials/certificates and test environment are known. Until then the provider interfaces remain explicit boundaries rather than demo network calls.
 
 Next roadmap item after stage 11 validation is stage 12 REMD workflow. Extend the existing `medical_document_registrations` model instead of creating a parallel document-registration system.
+
+## Stage 12 handoff — REMD workflow — 2026-10-13
+
+Stage 12 extends the existing `medical_document_registrations` model through migration `024_remd_registration_workflow.sql`; it does not create a second registration subsystem. Each REMD registration can reference the durable Stage 11 `integration_jobs` queue and records requester, submit/attempt timestamps and sanitized error code.
+
+REMD submission now has explicit local readiness gates before a job can be created: immutable document-version hash, active document, clean scan result, valid qualified clinician signature, verified doctor regulatory profile and active medical-organization membership. Generic manual EGISZ job creation rejects `remd`, so this validation cannot be bypassed accidentally.
+
+Integration lifecycle methods keep the registration record synchronized when a REMD job is claimed, retried, succeeds or fails. Provider result metadata may update only technical REMD state/external ID; clinical document text is not copied into integration errors, audit metadata or the admin REMD screen.
+
+The admin UI at `/admin/integrations/remd` lists ready candidates and registrations, performs readiness checks, queues eligible immutable versions and retries failed jobs. It deliberately does not claim that a queued item was sent to EGISZ: there is still no live REMD transport adapter until the actual contract, test contour and credentials/certificates are known.
+
+After Stage 12 validation, continue with the next roadmap item: contracts. Reuse existing patient profiles, medical organizations, appointments, consents and payment references rather than introducing parallel patient/service entities.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDaysIcon, CreditCardIcon, ShieldCheckIcon, UserGroupIcon } from "@heroicons/react/24/outline";
+import { CalendarDaysIcon, CloudArrowUpIcon, CreditCardIcon, ShieldCheckIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { useStaffResource, StaffLoadState } from "@/components/StaffRequest";
 
 type Dashboard = {
@@ -34,6 +34,7 @@ export function AdminDashboardClient() {
         <Link href="/admin/doctors" className="admin-quick-card"><UserGroupIcon /><div><b>Проверка врачей</b><p>Верификация и публикация профессиональных профилей.</p></div></Link>
         <Link href="/admin/appointments" className="admin-quick-card"><CalendarDaysIcon /><div><b>Записи</b><p>Операционный статус консультаций без клинических заметок.</p></div></Link>
         <Link href="/admin/payments" className="admin-quick-card"><CreditCardIcon /><div><b>Платежи</b><p>Статусы транзакций и сверка платежного потока.</p></div></Link>
+        <Link href="/admin/integrations/remd" className="admin-quick-card"><CloudArrowUpIcon /><div><b>РЭМД</b><p>Готовность электронных медицинских документов и очередь регистрации ЕГИСЗ.</p></div></Link>
         <Link href="/admin/audit" className="admin-quick-card"><ShieldCheckIcon /><div><b>Audit trail</b><p>Системные действия и контроль доступа.</p></div></Link>
       </section>
     </main>

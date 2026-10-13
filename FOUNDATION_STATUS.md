@@ -36,34 +36,42 @@ The current source also contains:
 - ESIA identity-linking architecture through Keycloak federation
 - EGISZ integration boundary with organization, doctor, REMD and patient adapters
 - durable EGISZ integration jobs, events, sanitized errors and retry scheduling
+- REMD readiness checks and registration queue built on `medical_document_registrations`
+- synchronized REMD registration/job lifecycle for queue, submit, retry, register and fail states
+- admin REMD operations screen without clinical-document content
 
-Database migrations currently run from `001_initial.sql` through `023_egisz_integration.sql`.
+Database migrations currently run from `001_initial.sql` through `024_remd_registration_workflow.sql`.
 
 ## Validation on 2026-10-13
 
-- root TypeScript typecheck: PASS
-- API TypeScript typecheck after the EGISZ changes: PASS
-- API production build after the EGISZ changes: PASS
-- Web production build: PASS
-- Next.js pages generated: 23
-- infrastructure static validation: PASS
-- `git diff --check`: PASS
-
-The web build initially exposed an imported root `route.ts` that conflicted with the real root `page.tsx`. The conflicting handler only served the historical `igor.html` artifact and was removed; the actual Next.js home page remains the root route.
+- root TypeScript typecheck: PASS after Stage 12 changes
+- API TypeScript typecheck: PASS after Stage 12 changes
+- production build: PASS after Stage 12 changes (API + Web, 24 Next.js routes)
+- infrastructure static validation: PASS after Stage 12 changes
+- `git diff --check`: PASS before final Stage 12 commit
 
 ## Runtime status for this change
 
-Docker CLI is not installed on the HP workstation used for this change. Therefore migration `023`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is complete; database/runtime validation must run in a Docker/PostgreSQL-capable environment before production use.
+Docker CLI is not installed on the HP workstation used for this change. Therefore migration `024`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
 
-## EGISZ boundary status
+## EGISZ / REMD boundary status
 
-Stage 11 provides the durable integration boundary and queue semantics, but no fake EGISZ network success path is implemented. A real provider adapter must be wired only after the selected integration contract, endpoint, test environment and credentials/certificates are known.
+Stage 11 provides the durable integration boundary and queue semantics. Stage 12 connects REMD registration to the existing immutable medical-document/version model and refuses to bypass readiness requirements through the generic integration-job endpoint.
+
+A version is locally eligible for REMD only when it has an immutable SHA-256, belongs to an active and clean document, has a valid qualified clinician signature, the signing doctor's regulatory profile is verified and that doctor is linked to an active medical organization. These are local readiness gates, not a claim of EGISZ conformance.
+
+No fake EGISZ/REMD network success path is implemented. A real provider adapter must be wired only after the selected integration contract, endpoint, test environment and credentials/certificates are known.
+
+## Next roadmap item
+
+After Stage 12 validation, the next unfinished roadmap item is the patient/medical-service contract layer. It must be added without duplicating appointments, consents, payments or medical-organization ownership already present in the domain model.
 
 ## Not production-complete
 
 - live EGISZ/REMD provider integration and conformance testing
 - production clinician identity proofing and qualified electronic-signature provider
-- production payment provider and reconciliation/KKT
+- patient/medical-service contract workflow
+- production payment provider, reconciliation and KKT
 - production email/SMS/push provider configuration
 - KMS/envelope encryption where required
 - tested production backup/restore and disaster recovery

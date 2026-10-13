@@ -63,6 +63,9 @@ export class EgiszIntegrationService {
 
   async enqueue(principal: Principal, input: CreateEgiszIntegrationJobDto) {
     const actor = await this.requireAdmin(principal);
+    if (input.adapterKind === "remd") {
+      throw new BadRequestException("Use the REMD registration workflow endpoint for medical documents");
+    }
     this.assertAdapterTarget(input.adapterKind, input.targetType);
     await this.ensureTargetExists(input.targetType, input.targetId);
 
@@ -196,7 +199,7 @@ export class EgiszIntegrationService {
     const actor = await this.requireAdmin(principal);
     const job = await this.db.tx(async (client) => {
       const current = await client.query(
-        `select id,status,attempt_count,max_attempts from integration_jobs
+        `select id,status,attempt_count,max_attempts,adapter_kind,target_id from integration_jobs
          where id=$1 and provider='egisz' for update`,
         [jobId],
       );
@@ -224,6 +227,14 @@ export class EgiszIntegrationService {
          values($1,'retry_scheduled',$2::jsonb)`,
         [jobId, JSON.stringify({ attemptNo: nextAttempt, source: "admin_api" })],
       );
+      if (row.adapter_kind === "remd") {
+        await client.query(
+          `update medical_document_registrations
+           set status='queued',last_error=null,last_error_code=null,updated_at=now()
+           where document_version_id=$1 and registry='egisz_remd' and integration_job_id=$2`,
+          [row.target_id, jobId],
+        );
+      }
       const refreshed = await client.query(`select * from integration_jobs where id=$1`, [jobId]);
       return refreshed.rows[0];
     });
@@ -268,6 +279,15 @@ export class EgiszIntegrationService {
          values($1,'started',$2::jsonb)`,
         [jobId, JSON.stringify({ attemptNo: job.attemptCount, workerId })],
       );
+      if (job.adapterKind === "remd") {
+        await client.query(
+          `update medical_document_registrations
+           set status='submitted',attempt_count=$3,last_attempt_at=now(),submitted_at=coalesce(submitted_at,now()),
+               last_error=null,last_error_code=null,updated_at=now()
+           where document_version_id=$1 and registry='egisz_remd' and integration_job_id=$2`,
+          [job.targetId, jobId, job.attemptCount],
+        );
+      }
       return job;
     });
   }
@@ -275,12 +295,15 @@ export class EgiszIntegrationService {
   async markSucceeded(jobId: string, metadata: SafeResultMetadata = {}) {
     return this.db.tx(async (client) => {
       const current = await client.query(
-        `select id,status,attempt_count from integration_jobs where id=$1 and provider='egisz' for update`,
+        `select id,status,attempt_count,adapter_kind,target_id from integration_jobs where id=$1 and provider='egisz' for update`,
         [jobId],
       );
       const row = current.rows[0];
       if (!row) throw new NotFoundException("Integration job not found");
       if (row.status !== "processing") throw new ConflictException("Integration job is not processing");
+      if (row.adapter_kind === "remd" && metadata.status !== "accepted" && metadata.status !== "registered") {
+        throw new BadRequestException("REMD success metadata must report accepted or registered status");
+      }
       await client.query(
         `update integration_jobs
          set status='succeeded',result_metadata=$2::jsonb,completed_at=now(),locked_at=null,locked_by=null,updated_at=now()
@@ -297,6 +320,25 @@ export class EgiszIntegrationService {
          values($1,'succeeded',$2::jsonb)`,
         [jobId, JSON.stringify({ attemptNo: row.attempt_count, ...metadata })],
       );
+      if (row.adapter_kind === "remd") {
+        const providerStatus = metadata.status === "registered" ? "registered" : "submitted";
+        const externalId = typeof metadata.externalId === "string" ? metadata.externalId : null;
+        await client.query(
+          `update medical_document_registrations
+           set status=$3,external_id=coalesce($4,external_id),attempt_count=$5,
+               registration_date=case when $3='registered' then coalesce(registration_date,now()) else registration_date end,
+               last_error=null,last_error_code=null,metadata=metadata || $6::jsonb,updated_at=now()
+           where document_version_id=$1 and registry='egisz_remd' and integration_job_id=$2`,
+          [
+            row.target_id,
+            jobId,
+            providerStatus,
+            externalId,
+            row.attempt_count,
+            JSON.stringify({ providerStatus: metadata.status ?? null }),
+          ],
+        );
+      }
       return { id: jobId, status: "succeeded" as const };
     });
   }
@@ -307,7 +349,7 @@ export class EgiszIntegrationService {
 
     return this.db.tx(async (client) => {
       const current = await client.query(
-        `select id,status,attempt_count,max_attempts from integration_jobs
+        `select id,status,attempt_count,max_attempts,adapter_kind,target_id from integration_jobs
          where id=$1 and provider='egisz' for update`,
         [jobId],
       );
@@ -335,6 +377,14 @@ export class EgiszIntegrationService {
            where id=$1`,
           [jobId],
         );
+        if (row.adapter_kind === "remd") {
+          await client.query(
+            `update medical_document_registrations
+             set status='failed',attempt_count=$3,last_attempt_at=now(),last_error_code=$4,last_error=$5,updated_at=now()
+             where document_version_id=$1 and registry='egisz_remd' and integration_job_id=$2`,
+            [row.target_id, jobId, attemptNo, errorCode, message],
+          );
+        }
         return { id: jobId, status: "failed" as const, retryScheduled: false };
       }
 
@@ -357,6 +407,14 @@ export class EgiszIntegrationService {
          values($1,'retry_scheduled',$2::jsonb)`,
         [jobId, JSON.stringify({ attemptNo: nextAttempt, delaySeconds, reasonCode: errorCode })],
       );
+      if (row.adapter_kind === "remd") {
+        await client.query(
+          `update medical_document_registrations
+           set status='queued',attempt_count=$3,last_attempt_at=now(),last_error_code=$4,last_error=$5,updated_at=now()
+           where document_version_id=$1 and registry='egisz_remd' and integration_job_id=$2`,
+          [row.target_id, jobId, attemptNo, errorCode, message],
+        );
+      }
       return { id: jobId, status: "queued" as const, retryScheduled: true };
     });
   }

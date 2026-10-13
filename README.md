@@ -18,11 +18,15 @@ Provider-neutral technical foundation being developed as a commercial telemedici
 
 The recovered 0.13 tree contains patient/family profiles, doctor catalog and booking, doctor workspace and consultation lifecycle, immutable signed clinical versions, protected document upload/download/grants, video consultation rooms, notifications/outbox, development payments, admin/support surfaces, favorites and appointment ratings.
 
-Roadmap work after recovery adds a separate medical encounter, patient medical-record aggregation, medical conclusions, immutable medical-document versions, signature abstraction, versioned patient consents, medical-organization data, doctor regulatory credentials, legal representatives, ESIA identity-linking architecture and a dedicated EGISZ integration job boundary.
+Roadmap work after recovery adds a separate medical encounter, patient medical-record aggregation, medical conclusions, immutable medical-document versions, signature abstraction, versioned patient consents, medical-organization data, doctor regulatory credentials, legal representatives, ESIA identity-linking architecture, a dedicated EGISZ integration-job boundary and the REMD registration workflow.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `023_egisz_integration.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `024_remd_registration_workflow.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
-The EGISZ integration layer deliberately does not fake a production connection. Real registry/REMD transport must be supplied through the adapter boundary after the selected integration contract, test environment and credentials/certificates are known.
+## EGISZ / REMD boundary
+
+The integration layer deliberately does not fake a production EGISZ connection. Real registry/REMD transport must be supplied through the adapter boundary after the selected integration contract, test environment and credentials/certificates are known.
+
+REMD registration uses the existing `medical_document_registrations` table. A medical-document version can enter the REMD queue only after the local readiness gates pass: immutable SHA-256, active/clean document, valid qualified clinician signature, verified doctor regulatory profile and an active medical organization. The generic EGISZ job endpoint cannot bypass this REMD workflow. Queue, retry and provider-result state transitions are synchronized with the registration record without storing clinical text in integration errors or the admin UI.
 
 ## Local development
 
