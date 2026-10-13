@@ -93,7 +93,7 @@ export class AppointmentsService {
         `update appointment_slots
          set status='booked',updated_at=now()
          where id=$1 and status='available' and starts_at>now()
-         returning id,doctor_id,starts_at,ends_at,price_minor,currency`,
+         returning id,doctor_id,starts_at,ends_at,price_minor,currency,service_offer_id`,
         [input.slotId],
       );
       const slot = slotResult.rows[0];
@@ -101,10 +101,10 @@ export class AppointmentsService {
 
       const appointmentResult = await client.query(
         `insert into appointments(
-           slot_id,doctor_id,patient_profile_id,created_by_user_id,status,reason,patient_timezone,price_minor,currency
-         ) values ($1,$2,$3,$4,'confirmed',$5,$6,$7,$8)
-         returning id,status,created_at`,
-        [slot.id, slot.doctor_id, input.patientProfileId, user.id, input.reason || null, input.timezone, slot.price_minor, slot.currency],
+           slot_id,doctor_id,patient_profile_id,created_by_user_id,status,reason,patient_timezone,price_minor,currency,service_offer_id
+         ) values ($1,$2,$3,$4,'confirmed',$5,$6,$7,$8,$9)
+         returning id,status,created_at,service_offer_id`,
+        [slot.id, slot.doctor_id, input.patientProfileId, user.id, input.reason || null, input.timezone, slot.price_minor, slot.currency, slot.service_offer_id ?? null],
       );
       const appointment = appointmentResult.rows[0];
       await client.query(
@@ -115,7 +115,7 @@ export class AppointmentsService {
       await client.query(
         `insert into audit_events(actor_user_id,actor_subject,action,resource_type,resource_id,metadata)
          values ($1,$2,'appointment.book','appointment',$3,$4::jsonb)`,
-        [user.id, principal.sub, appointment.id, JSON.stringify({ slotId: slot.id })],
+        [user.id, principal.sub, appointment.id, JSON.stringify({ slotId: slot.id, serviceOfferId: appointment.service_offer_id ?? null })],
       );
       await client.query(
         `insert into outbox_events(aggregate_type,aggregate_id,event_type,payload)
@@ -129,6 +129,7 @@ export class AppointmentsService {
         startsAt: new Date(slot.starts_at).toISOString(),
         endsAt: new Date(slot.ends_at).toISOString(),
         price: { amountMinor: slot.price_minor, currency: slot.currency },
+        serviceOfferId: appointment.service_offer_id ?? null,
       };
       if (idempotencyKey) {
         await client.query(

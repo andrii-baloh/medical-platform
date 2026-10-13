@@ -18,9 +18,11 @@ Provider-neutral technical foundation being developed as a commercial telemedici
 
 The recovered 0.13 tree contains patient/family profiles, doctor catalog and booking, doctor workspace and consultation lifecycle, immutable signed clinical versions, protected document upload/download/grants, video consultation rooms, notifications/outbox, development payments, admin/support surfaces, favorites and appointment ratings.
 
-Roadmap work after recovery adds a separate medical encounter, patient medical-record aggregation, medical conclusions, immutable medical-document versions, signature abstraction, versioned patient consents, medical-organization data, doctor regulatory credentials, legal representatives, ESIA identity-linking architecture, a dedicated EGISZ integration-job boundary and the REMD registration workflow.
+Roadmap work after recovery adds a separate medical encounter, patient medical-record aggregation, medical conclusions, immutable medical-document versions, signature abstraction, versioned patient consents, medical-organization data, doctor regulatory credentials, legal representatives, ESIA identity-linking architecture, a dedicated EGISZ integration-job boundary, the REMD registration workflow and the paid-medical-service contract layer.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `024_remd_registration_workflow.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Stage 13 adds organization-owned service catalogs and offers, immutable versioned contract text, patient contract acceptance evidence and immutable commercial snapshots. Doctor slots may be linked to a configured service offer; the patient sees the organization, license, service, doctor, exact price, conditions, refund rules and service procedure before accepting the contract. The existing payment API refuses to create a payment session until the appointment has a matching accepted contract, so the frontend cannot bypass the legal pre-payment gate.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `025_paid_medical_services.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 

@@ -36,10 +36,14 @@ export class DoctorsService {
 
   async slots(doctorId: string) {
     const { rows } = await this.db.query(
-      `select id,doctor_id,starts_at,ends_at,price_minor,currency
-       from appointment_slots
-       where doctor_id=$1 and status='available' and starts_at>now()
-       order by starts_at limit 80`,
+      `select s.id,s.doctor_id,s.starts_at,s.ends_at,s.price_minor,s.currency,s.service_offer_id,
+              so.title service_offer_title,sc.name service_name,o.short_name organization_name,o.license_number
+       from appointment_slots s
+       left join service_offers so on so.id=s.service_offer_id
+       left join service_catalogs sc on sc.id=so.service_catalog_id
+       left join medical_organizations o on o.id=so.organization_id
+       where s.doctor_id=$1 and s.status='available' and s.starts_at>now()
+       order by s.starts_at limit 80`,
       [doctorId],
     );
     return rows.map((r) => ({
@@ -48,6 +52,13 @@ export class DoctorsService {
       startsAt: new Date(r.starts_at).toISOString(),
       endsAt: new Date(r.ends_at).toISOString(),
       price: { amountMinor: r.price_minor, currency: r.currency },
+      serviceOffer: r.service_offer_id ? {
+        id: r.service_offer_id,
+        title: r.service_offer_title,
+        serviceName: r.service_name,
+        organizationName: r.organization_name,
+        licenseNumber: r.license_number,
+      } : null,
     }));
   }
 }

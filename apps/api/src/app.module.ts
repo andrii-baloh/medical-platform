@@ -1,4 +1,4 @@
-﻿import { Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { DbModule } from "./db/db.module";
 import { AuthModule } from "./auth/auth.module";
@@ -29,6 +29,42 @@ import { DoctorRegulatoryModule } from "./doctor-regulatory/doctor-regulatory.mo
 import { RepresentativesModule } from "./representatives/representatives.module";
 import { EsiaIdentityModule } from "./identity/esia-identity.module";
 import { EgiszIntegrationModule } from "./integrations/egisz/egisz-integration.module";
+import { CommercialServicesModule } from "./commercial-services/commercial-services.module";
 import { validateEnv } from "./config/env";
-@Module({imports:[ConfigModule.forRoot({isGlobal:true,validate:validateEnv}),RequestContextModule,DbModule,AuthModule,AuditModule,UsersModule,DoctorsModule,AppointmentsModule,DocumentsModule,DoctorWorkspaceModule,VideoModule,PatientResultsModule,NotificationsModule,OutboxModule,PaymentsModule,AdminModule,SupportModule,EngagementModule,PatientProfilesModule,MedicalEncountersModule,MedicalRecordsModule,MedicalConclusionsModule,SignaturesModule,ConsentsModule,MedicalOrganizationsModule,DoctorRegulatoryModule,RepresentativesModule,EsiaIdentityModule,EgiszIntegrationModule],controllers:[HealthController]})
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    RequestContextModule,
+    DbModule,
+    AuthModule,
+    AuditModule,
+    UsersModule,
+    DoctorsModule,
+    AppointmentsModule,
+    DocumentsModule,
+    DoctorWorkspaceModule,
+    VideoModule,
+    PatientResultsModule,
+    NotificationsModule,
+    OutboxModule,
+    PaymentsModule,
+    AdminModule,
+    SupportModule,
+    EngagementModule,
+    PatientProfilesModule,
+    MedicalEncountersModule,
+    MedicalRecordsModule,
+    MedicalConclusionsModule,
+    SignaturesModule,
+    ConsentsModule,
+    MedicalOrganizationsModule,
+    DoctorRegulatoryModule,
+    RepresentativesModule,
+    EsiaIdentityModule,
+    EgiszIntegrationModule,
+    CommercialServicesModule,
+  ],
+  controllers: [HealthController],
+})
 export class AppModule {}

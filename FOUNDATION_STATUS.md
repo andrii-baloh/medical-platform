@@ -39,20 +39,28 @@ The current source also contains:
 - REMD readiness checks and registration queue built on `medical_document_registrations`
 - synchronized REMD registration/job lifecycle for queue, submit, retry, register and fail states
 - admin REMD operations screen without clinical-document content
+- organization-owned paid medical service catalogs and doctor service offers
+- immutable versioned contract text and patient contract acceptance evidence
+- immutable patient commercial snapshots for appointment price/terms/organization/doctor
+- patient pre-payment view of organization, license, service, doctor, price, refund terms and service procedure
+- server-side payment gate requiring a matching accepted commercial contract
+- admin paid-service configuration screen and doctor slot-to-offer linking
 
-Database migrations currently run from `001_initial.sql` through `024_remd_registration_workflow.sql`.
+Database migrations currently run from `001_initial.sql` through `025_paid_medical_services.sql`.
 
 ## Validation on 2026-10-13
 
-- root TypeScript typecheck: PASS after Stage 12 changes
-- API TypeScript typecheck: PASS after Stage 12 changes
-- production build: PASS after Stage 12 changes (API + Web, 24 Next.js routes)
-- infrastructure static validation: PASS after Stage 12 changes
-- `git diff --check`: PASS before final Stage 12 commit
+- root TypeScript typecheck: PASS after Stage 13 changes
+- API TypeScript typecheck: PASS after Stage 13 changes
+- Web TypeScript typecheck: PASS after Stage 13 changes
+- production build: PASS after Stage 13 changes (API + Web, 25 Next.js routes)
+- `/admin/services` generated in the production build
+- infrastructure static validation: PASS after Stage 13 changes
+- `git diff --check`: PASS before final Stage 13 commit
 
 ## Runtime status for this change
 
-Docker CLI is not installed on the HP workstation used for this change. Therefore migration `024`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
+Docker CLI is not installed on the HP workstation used for this change. Therefore migration `025`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
 
 ## EGISZ / REMD boundary status
 
@@ -64,14 +72,13 @@ No fake EGISZ/REMD network success path is implemented. A real provider adapter 
 
 ## Next roadmap item
 
-After Stage 12 validation, the next unfinished roadmap item is the patient/medical-service contract layer. It must be added without duplicating appointments, consents, payments or medical-organization ownership already present in the domain model.
+After Stage 13 validation, the next unfinished roadmap item is Stage 14: production payment and fiscalization/KKT architecture. Extend the existing `payments`, `payment_events` and `refunds` flow instead of creating a parallel payment system; add receipt/fiscal records and a real provider boundary only with explicit configuration and credentials.
 
 ## Not production-complete
 
 - live EGISZ/REMD provider integration and conformance testing
 - production clinician identity proofing and qualified electronic-signature provider
-- patient/medical-service contract workflow
-- production payment provider, reconciliation and KKT
+- production payment provider, reconciliation and KKT/fiscal receipt delivery
 - production email/SMS/push provider configuration
 - KMS/envelope encryption where required
 - tested production backup/restore and disaster recovery

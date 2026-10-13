@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsInt, IsOptional, IsString, Matches, Max, Min, ValidateNested } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 
 export class DoctorCancelAppointmentDto {
@@ -30,6 +30,10 @@ export class SlotInputDto {
 }
 
 export class CreateDoctorSlotsDto {
+  @IsOptional()
+  @IsUUID()
+  serviceOfferId?: string;
+
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(64) @ValidateNested({ each: true }) @Type(() => SlotInputDto)
   slots!: SlotInputDto[];
 }

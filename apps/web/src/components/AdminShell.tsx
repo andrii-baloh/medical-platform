@@ -12,6 +12,7 @@ import {
   EnvelopeIcon,
   HomeIcon,
   ShieldCheckIcon,
+  Squares2X2Icon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 
@@ -20,6 +21,7 @@ const items = [
   { href: "/admin/doctors", label: "Врачи", icon: UserGroupIcon },
   { href: "/admin/appointments", label: "Записи", icon: CalendarDaysIcon },
   { href: "/admin/payments", label: "Платежи", icon: CreditCardIcon },
+  { href: "/admin/services", label: "Услуги", icon: Squares2X2Icon },
   { href: "/admin/integrations/remd", label: "РЭМД", icon: CloudArrowUpIcon },
   { href: "/admin/support", label: "Поддержка", icon: ChatBubbleLeftRightIcon },
   { href: "/admin/notifications", label: "Доставка", icon: EnvelopeIcon },

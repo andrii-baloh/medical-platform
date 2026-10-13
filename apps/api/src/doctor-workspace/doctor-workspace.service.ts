@@ -541,8 +541,11 @@ export class DoctorWorkspaceService {
     const toDate = to ? new Date(to) : new Date(Date.now() + 31 * 86400000);
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || toDate <= fromDate) throw new UnprocessableEntityException("Invalid date range");
     const { rows } = await this.db.query(
-      `select s.id,s.starts_at,s.ends_at,s.status,s.price_minor,s.currency,a.id appointment_id,a.status appointment_status,p.full_name patient_name
+      `select s.id,s.starts_at,s.ends_at,s.status,s.price_minor,s.currency,
+              s.service_offer_id,so.title service_offer_title,
+              a.id appointment_id,a.status appointment_status,p.full_name patient_name
        from appointment_slots s
+       left join service_offers so on so.id=s.service_offer_id
        left join appointments a on a.slot_id=s.id and a.status not in ('cancelled_by_patient','cancelled_by_doctor')
        left join patient_profiles p on p.id=a.patient_profile_id
        where s.doctor_id=$1 and s.starts_at >= $2 and s.starts_at < $3
@@ -555,6 +558,7 @@ export class DoctorWorkspaceService {
       endsAt: new Date(r.ends_at).toISOString(),
       status: r.status,
       price: { amountMinor: r.price_minor, currency: r.currency },
+      serviceOffer: r.service_offer_id ? { id: r.service_offer_id, title: r.service_offer_title } : null,
       appointment: r.appointment_id ? { id: r.appointment_id, status: r.appointment_status, patientName: r.patient_name } : null,
     }));
   }
@@ -567,15 +571,52 @@ export class DoctorWorkspaceService {
       if (slot.startsAt.getTime() <= Date.now()) throw new UnprocessableEntityException("Slots must be in the future");
       if (slot.endsAt.getTime() - slot.startsAt.getTime() > 4 * 60 * 60 * 1000) throw new UnprocessableEntityException("Slot is too long");
     }
+
+    let serviceOffer: any = null;
+    if (input.serviceOfferId) {
+      const offer = await this.db.query(
+        `select so.id,so.price_minor,so.currency,so.valid_from,so.valid_until
+         from service_offers so
+         join service_catalogs sc on sc.id=so.service_catalog_id and sc.active=true
+         join medical_organizations o on o.id=so.organization_id and o.active=true
+         join contract_templates ct on ct.id=so.contract_template_id and ct.active=true
+         where so.id=$1 and so.doctor_id=$2 and so.active=true
+           and exists(
+             select 1 from doctor_organization_memberships m
+             where m.doctor_id=so.doctor_id and m.organization_id=so.organization_id and m.active=true
+               and (m.starts_at is null or m.starts_at<=current_date)
+               and (m.ends_at is null or m.ends_at>=current_date)
+           )
+           and exists(
+             select 1 from contract_versions cv
+             where cv.template_id=ct.id and cv.retired_at is null and cv.published_at<=now()
+           )`,
+        [input.serviceOfferId, doctor.id],
+      );
+      serviceOffer = offer.rows[0];
+      if (!serviceOffer) throw new ConflictException("Commercial service offer is not available");
+      const offerStart = new Date(serviceOffer.valid_from).getTime();
+      const offerEnd = serviceOffer.valid_until ? new Date(serviceOffer.valid_until).getTime() : null;
+      if (normalized.some((slot) => slot.startsAt.getTime() < offerStart || (offerEnd !== null && slot.startsAt.getTime() >= offerEnd))) {
+        throw new ConflictException("One or more slots fall outside the commercial offer validity period");
+      }
+    }
     const created: any[] = [];
     try {
       await this.db.tx(async (client) => {
         for (const slot of normalized) {
           const result = await client.query(
-            `insert into appointment_slots(doctor_id,starts_at,ends_at,status,price_minor,currency)
-             values ($1,$2,$3,'available',$4,$5)
+            `insert into appointment_slots(doctor_id,starts_at,ends_at,status,price_minor,currency,service_offer_id)
+             values ($1,$2,$3,'available',$4,$5,$6)
              on conflict (doctor_id,starts_at) do nothing returning *`,
-            [doctor.id, slot.startsAt, slot.endsAt, doctor.price_minor, doctor.currency],
+            [
+              doctor.id,
+              slot.startsAt,
+              slot.endsAt,
+              serviceOffer?.price_minor ?? doctor.price_minor,
+              serviceOffer?.currency ?? doctor.currency,
+              serviceOffer?.id ?? null,
+            ],
           );
           if (result.rows[0]) created.push(result.rows[0]);
         }
@@ -584,8 +625,8 @@ export class DoctorWorkspaceService {
       if (error?.code === "23P01" || error?.code === "23505") throw new ConflictException("A slot overlaps an existing time interval");
       throw error;
     }
-    await this.audit.record({ actorUserId: user.id, actorSubject: principal.sub, action: "doctor.slots.create", resourceType: "doctor_profile", resourceId: doctor.id, metadata: { requested: input.slots.length, created: created.length } });
-    return created.map((r) => ({ id: r.id, startsAt: new Date(r.starts_at).toISOString(), endsAt: new Date(r.ends_at).toISOString(), status: r.status }));
+    await this.audit.record({ actorUserId: user.id, actorSubject: principal.sub, action: "doctor.slots.create", resourceType: "doctor_profile", resourceId: doctor.id, metadata: { requested: input.slots.length, created: created.length, serviceOfferId: serviceOffer?.id ?? null } });
+    return created.map((r) => ({ id: r.id, startsAt: new Date(r.starts_at).toISOString(), endsAt: new Date(r.ends_at).toISOString(), status: r.status, serviceOfferId: r.service_offer_id ?? null }));
   }
 
   async setSlotBlocked(principal: Principal, slotId: string, blocked: boolean) {

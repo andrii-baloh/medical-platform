@@ -83,3 +83,17 @@ Integration lifecycle methods keep the registration record synchronized when a R
 The admin UI at `/admin/integrations/remd` lists ready candidates and registrations, performs readiness checks, queues eligible immutable versions and retries failed jobs. It deliberately does not claim that a queued item was sent to EGISZ: there is still no live REMD transport adapter until the actual contract, test contour and credentials/certificates are known.
 
 After Stage 12 validation, continue with the next roadmap item: contracts. Reuse existing patient profiles, medical organizations, appointments, consents and payment references rather than introducing parallel patient/service entities.
+
+## Stage 13 handoff — paid medical services and contracts — 2026-10-13
+
+Stage 13 adds migration `025_paid_medical_services.sql` and reuses existing patients, appointments, medical organizations, doctors and payments. The new commercial domain contains organization-owned service catalogs/offers, immutable versioned contract text, patient contract records and append-only acceptance evidence. Accepted contracts preserve an immutable commercial snapshot of the organization/license, service, doctor, exact appointment price, conditions, refund terms, service procedure and contract version/hash.
+
+Doctor slots can now reference a configured service offer. Booking copies that offer to the appointment and preserves the offer price. Legacy/unconfigured slots remain bookable for compatibility, but the payment API rejects payment-session creation until the appointment has a matching accepted patient contract. This is a server-side gate, not only a frontend check.
+
+The patient booking/consultation UI uses `CommercialCheckoutCard` to show all required pre-payment facts and exact contract text before acceptance, then unlocks the existing payment flow. `/admin/services` provides configuration for service catalogs, contract templates/versions and offers; the doctor calendar can link new slots to an available offer. No legal contract text is fabricated or seeded by the application.
+
+Conceptual architecture was checked against open healthcare service models (Medplum/FHIR HealthcareService-style service definitions and FHIR price-definition patterns); no external source code was copied into this repository.
+
+Stage 13 source/type/build validation passed with 25 Next.js routes. PostgreSQL migration execution and end-to-end payment/contract runtime remain unverified on this HP because Docker/PostgreSQL runtime is unavailable here.
+
+Next roadmap item is Stage 14 payment + KKT/fiscalization. Extend the existing provider abstraction, `payments`, `payment_events` and `refunds`; do not create a second payment subsystem.

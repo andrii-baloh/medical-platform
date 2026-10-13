@@ -2,12 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircleIcon, ClockIcon, UserIcon } from "@heroicons/react/24/outline";
+import { CommercialCheckoutCard } from "@/components/CommercialCheckoutCard";
 import { browserApi } from "@/lib/api";
 
-type Slot = { id: string; doctorId: string; startsAt: string; endsAt: string; price: { amountMinor: number; currency: string } };
+type Slot = {
+  id: string;
+  doctorId: string;
+  startsAt: string;
+  endsAt: string;
+  price: { amountMinor: number; currency: string };
+  serviceOffer?: {
+    id: string;
+    title: string;
+    serviceName: string;
+    organizationName: string;
+    licenseNumber: string;
+  } | null;
+};
 type Me = { timezone: string; patientProfiles: { id: string; fullName: string }[] };
-type BookingResult = { id: string; status: string; startsAt: string; endsAt: string; price: { amountMinor: number; currency: string } };
-type Payment = { id: string; provider: string; status: string; checkoutUrl: string | null; amountMinor: number; currency: string };
+type BookingResult = {
+  id: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  price: { amountMinor: number; currency: string };
+  serviceOfferId: string | null;
+};
 type ApiError = Error & { status?: number };
 
 export function BookingClient({ slug }: { slug: string }) {
@@ -18,8 +38,6 @@ export function BookingClient({ slug }: { slug: string }) {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [payBusy, setPayBusy] = useState(false);
-  const [payment, setPayment] = useState<Payment | null>(null);
   const [needLogin, setNeedLogin] = useState(false);
   const [success, setSuccess] = useState<BookingResult | null>(null);
 
@@ -50,6 +68,8 @@ export function BookingClient({ slug }: { slug: string }) {
     return [...groups.entries()];
   }, [slots, me]);
 
+  const selectedSlot = slots.find((slot) => slot.id === slotId) ?? null;
+
   async function book() {
     if (!slotId || !patientId || !me) return;
     setBusy(true);
@@ -69,35 +89,19 @@ export function BookingClient({ slug }: { slug: string }) {
     }
   }
 
-  async function pay() {
-    if (!success) return;
-    setPayBusy(true);
-    setMessage("");
-    try {
-      const created = await browserApi<Payment>(`/payments/appointments/${success.id}/session`, { method: "POST", body: "{}" });
-      setPayment(created);
-      if (created.checkoutUrl) window.location.assign(created.checkoutUrl);
-    } catch {
-      setMessage("Запись создана, но платёжную сессию открыть не удалось.");
-    } finally {
-      setPayBusy(false);
-    }
-  }
-
   if (needLogin) return <div className="card booking-login"><h2>Войдите в аккаунт</h2><p>Для записи на консультацию нужен защищённый профиль пациента.</p><a className="btn primary" href="/login">Войти</a></div>;
 
   if (success && me) {
     return (
-      <div className="booking-success card">
-        <CheckCircleIcon />
-        <span className="eyebrow">Запись подтверждена</span>
-        <h2>Консультация добавлена в ваш кабинет</h2>
-        <p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: me.timezone }).format(new Date(success.startsAt))}</p>
-        {!payment && <button className="btn primary" disabled={payBusy} onClick={pay}>{payBusy ? "Подготовка оплаты…" : "Перейти к оплате"}</button>}
-        {payment?.checkoutUrl && <a className="btn primary" href={payment.checkoutUrl}>Открыть страницу оплаты</a>}
-        {payment?.provider === "development" && <div className="notice">Платёжная сессия создана в тестовом режиме. Реального списания денег нет.</div>}
-        {message && <div className="notice error">{message}</div>}
-        <div className="row wrap"><a className="btn" href={`/consultations/${success.id}`}>Открыть консультацию</a><a className="btn" href="/consultations">Все приёмы</a></div>
+      <div className="stack booking-complete-flow">
+        <div className="booking-success card">
+          <CheckCircleIcon />
+          <span className="eyebrow">Запись подтверждена</span>
+          <h2>Консультация добавлена в ваш кабинет</h2>
+          <p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: me.timezone }).format(new Date(success.startsAt))}</p>
+          <div className="row wrap"><a className="btn" href={`/consultations/${success.id}`}>Открыть консультацию</a><a className="btn" href="/consultations">Все приёмы</a></div>
+        </div>
+        <CommercialCheckoutCard appointmentId={success.id} />
       </div>
     );
   }
@@ -126,6 +130,10 @@ export function BookingClient({ slug }: { slug: string }) {
         <span className="eyebrow">Подтверждение</span>
         <h2>Запись на консультацию</h2>
         <p>После подтверждения приём появится в разделе «Мои приёмы».</p>
+        {selectedSlot && <div className="booking-commercial-preview">
+          <small>Стоимость</small><b>{new Intl.NumberFormat("ru-RU", { style: "currency", currency: selectedSlot.price.currency }).format(selectedSlot.price.amountMinor / 100)}</b>
+          {selectedSlot.serviceOffer ? <><span>{selectedSlot.serviceOffer.title}</span><span>{selectedSlot.serviceOffer.organizationName} · лицензия {selectedSlot.serviceOffer.licenseNumber}</span></> : <span className="muted">Коммерческие условия для этого слота ещё не настроены; оплата будет заблокирована.</span>}
+        </div>}
         <button className="btn primary" disabled={busy || !slotId || !patientId} onClick={book}>{busy ? "Создаём запись…" : "Подтвердить запись"}</button>
         {message && <div className="notice error">{message}</div>}
       </aside>

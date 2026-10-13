@@ -12,6 +12,8 @@ type AppointmentPaymentFacts = {
   status: string;
   amount_minor: number;
   currency: string;
+  service_offer_id: string | null;
+  patient_contract_id: string | null;
 };
 
 type PaymentRow = {
@@ -41,7 +43,8 @@ export class PaymentsService {
   private async requireOwnedAppointment(principal: Principal, appointmentId: string) {
     const user = await this.users.ensureAccount(principal);
     const { rows } = await this.db.query<AppointmentPaymentFacts>(
-      `select a.id appointment_id,p.owner_user_id,a.status,a.price_minor amount_minor,a.currency
+      `select a.id appointment_id,p.owner_user_id,a.status,a.price_minor amount_minor,a.currency,
+              a.service_offer_id,a.patient_contract_id
        from appointments a
        join patient_profiles p on p.id=a.patient_profile_id
        where a.id=$1 and p.owner_user_id=$2`,
@@ -70,6 +73,19 @@ export class PaymentsService {
     const { user, appointment } = await this.requireOwnedAppointment(principal, appointmentId);
     if (["cancelled_by_patient", "cancelled_by_doctor", "no_show"].includes(appointment.status)) {
       throw new ConflictException("Payment cannot be created for an inactive appointment");
+    }
+    if (!appointment.service_offer_id || !appointment.patient_contract_id) {
+      throw new ConflictException("Commercial service terms and contract acceptance are required before payment");
+    }
+    const acceptedContract = await this.db.query(
+      `select pc.id
+       from patient_contracts pc
+       where pc.id=$1 and pc.appointment_id=$2 and pc.service_offer_id=$3 and pc.status='accepted'
+         and pc.price_minor=$4 and pc.currency=$5`,
+      [appointment.patient_contract_id, appointmentId, appointment.service_offer_id, appointment.amount_minor, appointment.currency],
+    );
+    if (!acceptedContract.rows[0]) {
+      throw new ConflictException("Accepted commercial contract does not match this appointment");
     }
     const payment = await this.db.tx(async (client) => {
       // Serialize payment-session creation per appointment. The unique partial
