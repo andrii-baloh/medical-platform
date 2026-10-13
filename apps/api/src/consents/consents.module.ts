@@ -1,0 +1,1 @@
+﻿import { Module } from "@nestjs/common"; import { UsersModule } from "../users/users.module"; import { ConsentsController } from "./consents.controller"; import { ConsentsService } from "./consents.service"; @Module({imports:[UsersModule],controllers:[ConsentsController],providers:[ConsentsService]}) export class ConsentsModule {}

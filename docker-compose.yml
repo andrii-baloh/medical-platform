@@ -1,0 +1,175 @@
+name: medicare-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medicare}
+      POSTGRES_USER: ${POSTGRES_USER:-medicare}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-postgres-change-me}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init/000_create_keycloak_db.sql:/docker-entrypoint-initdb.d/000_create_keycloak_db.sql:ro
+      - ./db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+      - ./db/migrations/002_doctor_workspace.sql:/docker-entrypoint-initdb.d/002_doctor_workspace.sql:ro
+      - ./db/migrations/003_video_notifications.sql:/docker-entrypoint-initdb.d/003_video_notifications.sql:ro
+      - ./db/migrations/004_outbox_claiming.sql:/docker-entrypoint-initdb.d/004_outbox_claiming.sql:ro
+      - ./db/migrations/005_payments_admin.sql:/docker-entrypoint-initdb.d/005_payments_admin.sql:ro
+      - ./db/migrations/006_document_security.sql:/docker-entrypoint-initdb.d/006_document_security.sql:ro
+      - ./db/migrations/007_document_scan_recovery.sql:/docker-entrypoint-initdb.d/007_document_scan_recovery.sql:ro
+      - ./db/migrations/008_notification_delivery.sql:/docker-entrypoint-initdb.d/008_notification_delivery.sql:ro
+      - ./db/migrations/009_support.sql:/docker-entrypoint-initdb.d/009_support.sql:ro
+      - ./db/migrations/010_patient_engagement.sql:/docker-entrypoint-initdb.d/010_patient_engagement.sql:ro
+      - ./db/migrations/011_patient_phone.sql:/docker-entrypoint-initdb.d/011_patient_phone.sql:ro
+      - ./db/migrations/012_medical_core.sql:/docker-entrypoint-initdb.d/012_medical_core.sql:ro
+      - ./db/migrations/013_encounter_lifecycle.sql:/docker-entrypoint-initdb.d/013_encounter_lifecycle.sql:ro
+      - ./db/migrations/014_medical_record.sql:/docker-entrypoint-initdb.d/014_medical_record.sql:ro
+      - ./db/migrations/015_medical_conclusions.sql:/docker-entrypoint-initdb.d/015_medical_conclusions.sql:ro
+      - ./db/migrations/016_medical_document_versions.sql:/docker-entrypoint-initdb.d/016_medical_document_versions.sql:ro
+      - ./db/migrations/017_signature_architecture.sql:/docker-entrypoint-initdb.d/017_signature_architecture.sql:ro
+      - ./db/migrations/018_consent_system.sql:/docker-entrypoint-initdb.d/018_consent_system.sql:ro
+      - ./db/migrations/019_medical_organization.sql:/docker-entrypoint-initdb.d/019_medical_organization.sql:ro
+      - ./db/migrations/020_doctor_regulatory_profile.sql:/docker-entrypoint-initdb.d/020_doctor_regulatory_profile.sql:ro
+      - ./db/migrations/021_legal_representative.sql:/docker-entrypoint-initdb.d/021_legal_representative.sql:ro
+      - ./db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-medicare} -d ${POSTGRES_DB:-medicare}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks: [backend]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-medicare}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-local-dev-postgres-change-me}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-local-dev-keycloak-admin-change-me}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HOSTNAME: http://host.docker.internal:${KEYCLOAK_PORT:-8080}
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec \"{ printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&0; grep -Eq 'HTTP/1.[01] 200'; } 0<>/dev/tcp/127.0.0.1/9000\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks: [backend]
+
+  minio:
+    image: medicare/minio-community:recovered-20261009
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-medicare-root}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-minio-root-change-me}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if command -v curl >/dev/null 2>&1; then curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null; else grep -Eq ':2328 .* 0A ' /proc/net/tcp /proc/net/tcp6; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks: [backend]
+
+  minio-init:
+    image: medicare/mc-community:recovered-20261009
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-medicare-root}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-minio-root-change-me}
+      S3_BUCKET_MEDICAL: ${S3_BUCKET_MEDICAL:-medical-documents}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-medicare-app}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-minio-app-change-me}
+    volumes:
+      - ./infra/minio/policies:/config/policies:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+          i=0
+          until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+            i=$$((i+1))
+            if [ "$$i" -ge 20 ]; then echo 'MinIO init timeout'; exit 1; fi
+            sleep 2
+          done
+          mc mb --ignore-existing "local/$$S3_BUCKET_MEDICAL"
+          mc anonymous set none "local/$$S3_BUCKET_MEDICAL"
+          case "$$S3_BUCKET_MEDICAL" in *[!a-z0-9.-]*|'') echo 'Invalid bucket name'; exit 1;; esac
+          test "$$S3_ACCESS_KEY" != "$$MINIO_ROOT_USER"
+          sed "s/medical-documents/$$S3_BUCKET_MEDICAL/g" /config/policies/medical-documents.json > /tmp/medical-policy.json
+          mc admin policy create local medicare-medical /tmp/medical-policy.json || true
+          mc admin user add local "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" || true
+          mc admin policy attach local medicare-medical --user "$$S3_ACCESS_KEY"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks: [backend]
+
+  clamav:
+    image: clamav/clamav:1.5.4-debian
+    restart: unless-stopped
+    ports:
+      - "${CLAMAV_HOST_PORT:-3310}:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+      - ./infra/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+      - ./infra/clamav/freshclam.conf:/etc/clamav/freshclam.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=1 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks: [backend]
+
+  livekit:
+    image: livekit/livekit-server:v1.13.7
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit/config.yaml", "--node-ip", "127.0.0.1"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"
+    ports:
+      - "${LIVEKIT_HTTP_PORT:-7880}:7880"
+      - "${LIVEKIT_TCP_PORT:-7881}:7881"
+      - "${LIVEKIT_UDP_PORT:-7882}:7882/udp"
+    volumes:
+      - ./infra/livekit/config.yaml:/etc/livekit/config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "if command -v nc >/dev/null 2>&1; then nc -z 127.0.0.1 7880; else grep -Eq ':1EC8 .* 0A ' /proc/net/tcp /proc/net/tcp6; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks: [backend, media]
+
+networks:
+  backend:
+  media:
+
+volumes:
+  postgres_data:
+  minio_data:
+  clamav_db:

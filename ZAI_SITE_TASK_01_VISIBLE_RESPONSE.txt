@@ -1,0 +1,28 @@
+Chat
+Agent
+New Chat
+AI PPT
+Today
+Анализ demo-страницы MedicalPlatform
+Yesterday
+Креативный дизайн телемедицины
+New Chat
+September
+Детская игра по КПТ/CBT с 3 уровнями
+Изучение файла
+Определение фулstack
+Смотри ответ
+Привет
+Анализ MYSLEFORM: Дорожная карта 30 уровней
+Перечень тем для КПТ, чат заблокирован
+Как это работает?
+Loading...
+Meet Your AI Agents
+Code faster with ZCode. Automate more with AutoClaw.
+ZCode
+AutoClaw
+Татьяна Балог
+GLM-5.3-Flash
+Review this Russian medical demo landing page plan. Site: MedicalPlatform, local file igor.html. There are no real doctors yet, so all copy must be demo-safe and must not invent production claims. Current fixes: booking modal works, links work, demo doctors stay visible, fake huge doctor numbers removed. Give top 5 trust/clarity improvements for the landing, with exact Russian copy edits only. Do not propose backend work. 
+Deep Think
+Max

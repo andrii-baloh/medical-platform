@@ -1,0 +1,33 @@
+﻿import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { DbModule } from "./db/db.module";
+import { AuthModule } from "./auth/auth.module";
+import { UsersModule } from "./users/users.module";
+import { DoctorsModule } from "./doctors/doctors.module";
+import { AppointmentsModule } from "./appointments/appointments.module";
+import { DocumentsModule } from "./documents/documents.module";
+import { AuditModule } from "./audit/audit.module";
+import { HealthController } from "./common/health.controller";
+import { RequestContextModule } from "./common/request-context.module";
+import { DoctorWorkspaceModule } from "./doctor-workspace/doctor-workspace.module";
+import { VideoModule } from "./video/video.module";
+import { PatientResultsModule } from "./patient-results/patient-results.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { OutboxModule } from "./outbox/outbox.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { AdminModule } from "./admin/admin.module";
+import { SupportModule } from "./support/support.module";
+import { EngagementModule } from "./engagement/engagement.module";
+import { PatientProfilesModule } from "./patient-profiles/patient-profiles.module";
+import { MedicalEncountersModule } from "./medical-encounters/medical-encounters.module";
+import { MedicalRecordsModule } from "./medical-records/medical-records.module";
+import { MedicalConclusionsModule } from "./medical-conclusions/medical-conclusions.module";
+import { SignaturesModule } from "./signatures/signatures.module";
+import { ConsentsModule } from "./consents/consents.module";
+import { MedicalOrganizationsModule } from "./medical-organizations/medical-organizations.module";
+import { DoctorRegulatoryModule } from "./doctor-regulatory/doctor-regulatory.module";
+import { RepresentativesModule } from "./representatives/representatives.module";
+import { EsiaIdentityModule } from "./identity/esia-identity.module";
+import { validateEnv } from "./config/env";
+@Module({imports:[ConfigModule.forRoot({isGlobal:true,validate:validateEnv}),RequestContextModule,DbModule,AuthModule,AuditModule,UsersModule,DoctorsModule,AppointmentsModule,DocumentsModule,DoctorWorkspaceModule,VideoModule,PatientResultsModule,NotificationsModule,OutboxModule,PaymentsModule,AdminModule,SupportModule,EngagementModule,PatientProfilesModule,MedicalEncountersModule,MedicalRecordsModule,MedicalConclusionsModule,SignaturesModule,ConsentsModule,MedicalOrganizationsModule,DoctorRegulatoryModule,RepresentativesModule,EsiaIdentityModule],controllers:[HealthController]})
+export class AppModule {}

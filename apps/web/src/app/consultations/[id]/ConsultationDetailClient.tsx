@@ -1,0 +1,188 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, CreditCardIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
+import { AppointmentRating } from "@/components/AppointmentRating";
+import { VideoCallPanel } from "@/components/VideoCallPanel";
+import { patientRequest as browserApi } from "@/components/patientRequest";
+
+type Appointment = {
+  id: string;
+  status: string;
+  reason?: string | null;
+  startsAt: string;
+  endsAt: string;
+  patientTimezone: string;
+  doctor: { id: string; slug: string; fullName: string; specialty: string };
+  patient: { id: string; fullName: string; birthDate?: string | null; relationToOwner?: string };
+  price: { amountMinor: number; currency: string };
+};
+
+type SignedResult = {
+  appointmentId: string;
+  doctor: { id: string; fullName: string; specialty: string | null };
+  patient: { id: string; fullName: string };
+  version: number;
+  signedAt: string;
+  complaints: string;
+  anamnesis: string;
+  assessment: string;
+  recommendations: string;
+  contentSha256: string;
+  previousVersionSha256: string | null;
+  conclusionId: string | null;
+};
+
+type Payment = {
+  id: string;
+  appointmentId: string;
+  provider: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+  checkoutUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
+};
+
+const statusLabels: Record<string, string> = {
+  confirmed: "Подтверждён",
+  patient_checked_in: "Пациент подключился",
+  in_progress: "Идёт консультация",
+  completed: "Завершён",
+  cancelled_by_patient: "Отменён пациентом",
+  cancelled_by_doctor: "Отменён врачом",
+  no_show: "Не состоялся",
+};
+
+function formatInZone(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat("ru-RU", { timeZone, dateStyle: "long", timeStyle: "short" }).format(new Date(value));
+}
+
+function ResultSection({ result }: { result: SignedResult }) {
+  const sections = [
+    ["Жалобы", result.complaints || "Не указаны"],
+    ["Анамнез", result.anamnesis || "Не указан"],
+    ["Заключение", result.assessment || "Не указано"],
+    ["Рекомендации", result.recommendations || "Не указаны"],
+  ];
+  return (
+    <section className="signed-result-modern">
+      <div className="signed-result-header">
+        <div className="signed-result-icon"><DocumentCheckIcon /></div>
+        <div><span className="eyebrow">Медицинское заключение</span><h2>Версия {result.version}</h2><p>Подписано {new Date(result.signedAt).toLocaleString("ru-RU")}</p></div>
+        <span className="signed-badge"><CheckBadgeIcon /> Подписано</span>
+      </div>
+      <div className="signed-result-sections">
+        {sections.map(([title, value]) => <div key={title}><b>{title}</b><p>{value}</p></div>)}
+      </div>
+      {result.conclusionId && <a className="btn" href={`/api/backend/medical-conclusions/${result.conclusionId}/download`}>Скачать заключение</a>}
+      <details className="technical-result"><summary>Технический идентификатор документа</summary><code>{result.contentSha256}</code></details>
+    </section>
+  );
+}
+
+export function ConsultationDetailClient({ appointmentId }: { appointmentId: string }) {
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [result, setResult] = useState<SignedResult | null>(null);
+  const [versions, setVersions] = useState<SignedResult[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const mutation = useRef(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    setLoading(true);
+    setLoadError(false);
+    setMessage("");
+    setAppointment(null);
+    setResult(null);
+    setVersions([]);
+    setPayments([]);
+    let active = true;
+    (async () => {
+      try {
+        const appt = await browserApi<Appointment>(`/appointments/${appointmentId}`);
+        if (!active) return;
+        setAppointment(appt);
+        const [latest, loadedPayments] = await Promise.all([
+          browserApi<SignedResult>(`/appointments/${appointmentId}/result`).catch((error: { status?: number }) => { if (error.status === 404) return null; throw error; }),
+          browserApi<Payment[]>(`/payments/appointments/${appointmentId}`),
+        ]);
+        if (!active) return;
+        setPayments(loadedPayments);
+        setResult(latest);
+        if (latest) {
+          const all = await browserApi<SignedResult[]>(`/appointments/${appointmentId}/result/versions`);
+          if (active) setVersions(all);
+        }
+      } catch (error) {
+        if (active) { setLoadError(true); setMessage("Не удалось загрузить данные консультации. Повторите загрузку."); }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [appointmentId, reload]);
+
+  async function createPaymentSession() {
+    if (mutation.current) return;
+    mutation.current = true;
+    setPaymentBusy(true);
+    setMessage("");
+    try {
+      const payment = await browserApi<Payment>(`/payments/appointments/${appointmentId}/session`, { method: "POST", body: "{}" });
+      setPayments((current) => [payment, ...current.filter((item) => item.id !== payment.id)]);
+      if (payment.checkoutUrl) window.location.assign(payment.checkoutUrl);
+    } catch (error) {
+      setMessage("Не удалось создать платёжную сессию. Обновите данные перед повтором.");
+    } finally {
+      mutation.current = false;
+      setPaymentBusy(false);
+    }
+  }
+
+  if (loading) return <div className="card" role="status">Загрузка консультации…</div>;
+  if (!appointment || loadError) return <div className="notice error" role="alert">{message || "Консультация не найдена."} <button className="btn" disabled={paymentBusy} onClick={() => setReload(value => value + 1)}>Повторить загрузку</button></div>;
+  const activePayment = payments.find((item) => ["created", "authorized", "paid", "partially_refunded"].includes(item.status)) ?? payments[0] ?? null;
+
+  return (
+    <div className="consultation-detail-modern">
+      <Link className="back-link-modern" href="/consultations"><ArrowLeftIcon /> Мои консультации</Link>
+
+      <section className="consultation-detail-hero">
+        <div className="consultation-avatar large">{appointment.doctor.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
+        <div className="grow"><span className="doctor-specialty">{appointment.doctor.specialty}</span><h1>{appointment.doctor.fullName}</h1><div className="consultation-detail-meta"><span><CalendarDaysIcon /> {formatInZone(appointment.startsAt, appointment.patientTimezone)}</span><span><UserIcon /> {appointment.patient.fullName}</span><span><ClockIcon /> Онлайн</span></div></div>
+        <span className={`status status-${appointment.status}`}>{statusLabels[appointment.status] || appointment.status}</span>
+      </section>
+
+      <section className="card consultation-reason-card"><span className="eyebrow">Причина обращения</span><p>{appointment.reason || "Не указана"}</p></section>
+
+      <section className="card payment-card-patient">
+        <div className="payment-card-icon"><CreditCardIcon /></div>
+        <div className="grow">
+          <span className="eyebrow">Оплата</span>
+          <h3>{activePayment ? `Статус: ${activePayment.status}` : "Платёж ещё не создан"}</h3>
+          <p>{new Intl.NumberFormat("ru-RU", { style: "currency", currency: appointment.price.currency }).format(appointment.price.amountMinor / 100)} · платёж обрабатывается через внешний провайдер, карточные данные MediCare не хранит.</p>
+        </div>
+        {activePayment?.checkoutUrl ? <a className="btn primary" href={activePayment.checkoutUrl}>Перейти к оплате</a> : activePayment?.status === "paid" ? <span className="signed-badge">Оплачено</span> : activePayment?.provider === "development" ? <span className="payment-dev-badge">Тестовый платёж</span> : <button className="btn primary" disabled={paymentBusy} onClick={createPaymentSession}>{paymentBusy ? "Подготовка…" : activePayment ? "Повторить" : "Перейти к оплате"}</button>}
+      </section>
+
+      {message && <div className="notice error" role="alert">{message}</div>}
+
+      {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />}
+
+      {result ? <ResultSection result={result} /> : appointment.status === "completed" ? <div className="notice">Врач ещё не опубликовал подписанное заключение.</div> : null}
+
+      {appointment.id === appointmentId && appointment.status === "completed" && <AppointmentRating appointmentId={appointmentId} />}
+
+      {versions.length > 1 && <section className="card result-history-card"><span className="eyebrow">История</span><h2>Подписанные версии</h2><div className="version-list">{versions.map((item) => <details key={item.version}><summary>Версия {item.version} · {new Date(item.signedAt).toLocaleString("ru-RU")}</summary><p>{item.assessment || "Без текста заключения"}</p><code>{item.contentSha256}</code></details>)}</div></section>}
+    </div>
+  );
+}

@@ -1,0 +1,4 @@
+# Backward-compatible infrastructure-only entry point retained from the earlier repository layout.
+# For the complete 0.13 stack use the root docker-compose.yml plus docker-compose.override.yml.
+include:
+  - path: ../docker-compose.yml
