@@ -1,4 +1,4 @@
-# Foundation status 0.12
+# Foundation status 0.13
 
 ## Completed in code
 
@@ -13,6 +13,7 @@
 - provider-neutral LiveKit video adapter and patient/doctor video UI
 - in-app notifications, leased outbound email-delivery queue and admin delivery journal
 - patient/admin support ticket workflow with threaded replies, status and priority controls
+- patient engagement: favorite doctors and post-appointment doctor ratings (migration 010, one review per appointment, rating 1-5)
 - provider-neutral payment interface, development provider, webhook dedupe and refund records
 - admin dashboard, doctor verification/publication, appointments, payments, support, delivery and audit views
 - request correlation with validated/generated `x-request-id`
@@ -24,6 +25,11 @@
 - GitHub Actions CI baseline for install, typecheck, production build, critical dependency audit and whitespace checks
 - PostgreSQL custom-format backup, archive verification and explicit-target destructive restore scripts
 - operational runbook for health checks, migrations, backup drills, secret rotation and provider monitoring
+- root docker-compose.yml with postgres, keycloak, minio + minio-init, clamav and livekit, each with healthchecks and isolated backend/media networks
+- per-app multi-stage Dockerfiles for API (nest build) and WEB (next build) on node:22-alpine
+- docker-compose.override.yml that layers the API and WEB application services on top of the infrastructure stack
+- service configuration under infra/: MinIO least-privilege bucket policy, ClamAV clamd/freshclam config, LiveKit config, Keycloak realm export, postgres init
+- local developer scripts: scripts/dev-up.sh, scripts/dev-down.sh, scripts/build-all.sh, scripts/check.sh
 
 ## Security boundary notes
 
@@ -41,8 +47,8 @@ Access logging does not intentionally record request bodies, query strings, Auth
 
 ## Validation status
 
-- 0.12 root TypeScript typecheck: passed
-- 0.12 root production build: passed
+- 0.13 root TypeScript typecheck: passed (api and web workspaces)
+- 0.13 root production build: passed (nest build + next build, 22 routes)
 - 0.12 `npm audit --audit-level=critical`: passed; one high and one moderate PostCSS finding remain behind a breaking Next.js major upgrade
 - 0.12 PowerShell backup/verify/restore scripts: syntax parsed successfully
 - 0.12 `git diff --check`: passed (line-ending warnings only)
@@ -52,7 +58,7 @@ Access logging does not intentionally record request bodies, query strings, Auth
 
 Docker is not installed and PostgreSQL is not reachable. Therefore these are not claimed as runtime-verified:
 
-- executing migrations 003–009 against PostgreSQL
+- executing migrations 003–010 against PostgreSQL
 - starting PostgreSQL/Keycloak/MinIO/LiveKit/ClamAV through Docker
 - multi-process outbox, scan-job and outbound-delivery leases against PostgreSQL
 - real two-party patient ↔ doctor WebRTC

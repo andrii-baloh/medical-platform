@@ -1,0 +1,20 @@
+# MediCare local single-node LiveKit configuration.
+# Secrets are supplied through LIVEKIT_KEYS in docker-compose, not committed here.
+port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+
+room:
+  auto_create: true
+  empty_timeout: 300
+  departure_timeout: 20
+
+# Production:
+# - terminate TLS at a reverse proxy / load balancer and expose wss://
+# - configure TURN for restrictive networks
+# - use a public node IP or use_external_ip=true where appropriate
+# - add Redis before scaling beyond a single node

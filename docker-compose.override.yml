@@ -1,0 +1,57 @@
+# Local development overrides for docker-compose.yml
+# Loaded automatically by `docker compose` in addition to docker-compose.yml.
+# Adds application containers (api/web) that are intentionally absent from
+# the canonical infrastructure-only compose file.
+
+name: medicare-local
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: medicare/api:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medicare}:${POSTGRES_PASSWORD:-change-me-local}@postgres:5432/${POSTGRES_DB:-medicare}
+      OIDC_ISSUER_URL: http://keycloak:8080/realms/medicare
+      OIDC_JWKS_URL: http://keycloak:8080/realms/medicare/protocol/openid-connect/certs
+      S3_ENDPOINT: http://minio:9000
+      CLAMAV_HOST: clamav
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:4000}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - backend
+      - media
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: medicare/web:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      MEDICARE_API_URL: http://api:4000
+      AUTH_KEYCLOAK_ISSUER: http://keycloak:8080/realms/medicare
+      AUTH_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks:
+      - backend

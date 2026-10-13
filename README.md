@@ -1,4 +1,4 @@
-# MediCare platform 0.12 — patient, doctor, admin, support and operational-readiness foundation
+# MediCare platform 0.13 — patient, doctor, admin, support, engagement and operational foundation
 
 This repository is the provider-neutral foundation for a multi-country online medical consultation platform. Supabase is not an architectural dependency. The application uses standard interfaces so PostgreSQL, OIDC identity, S3-compatible storage, video and payment providers can be selected per launch country.
 
@@ -115,7 +115,7 @@ Requirements: Docker, Node.js 22+, npm.
 
 ```bash
 cp .env.example .env
-docker compose -f infra/docker-compose.dev.yml up -d
+docker compose up -d
 npm install
 npm --workspace @medicare/api run migrate
 npm --workspace @medicare/api run dev
@@ -137,6 +137,7 @@ Local-only demo accounts imported into Keycloak:
 ```text
 Doctor:  doctor@medicare.local / Doctor123!
 Patient: patient@medicare.local / Patient123!
+Admin:   admin@medicare.local / Admin123!
 ```
 
 These credentials are **development fixtures only**. Never reuse them in a shared, staging or production environment.

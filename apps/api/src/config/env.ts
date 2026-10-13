@@ -5,7 +5,7 @@ const schema = z.object({
   DEPLOYMENT_COUNTRY: z.string().regex(/^[A-Z]{2}$/).default("XX"),
   DEFAULT_LOCALE: z.string().min(2).default("ru"),
   DEFAULT_TIMEZONE: z.string().min(1).default("UTC"),
-  APP_VERSION: z.string().min(1).default("0.11.0"),
+  APP_VERSION: z.string().min(1).default("0.13.0"),
   OIDC_ISSUER_URL: z.string().url(),
   OIDC_JWKS_URL: z.string().url(),
   OIDC_AUDIENCE: z.string().min(1),

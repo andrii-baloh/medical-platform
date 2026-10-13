@@ -9,7 +9,7 @@ export class HealthController {
   private info() {
     return {
       service: "medicare-api",
-      version: process.env.APP_VERSION ?? "0.11.0",
+      version: process.env.APP_VERSION ?? "0.13.0",
     };
   }
 

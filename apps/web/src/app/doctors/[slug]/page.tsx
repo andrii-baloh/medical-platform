@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, LanguageIcon, StarIcon } from "@heroicons/react/24/outline";
 import { Chrome } from "@/components/Chrome";
+import { FavoriteDoctorButton } from "@/components/FavoriteDoctorButton";
 import { publicApi } from "@/lib/api";
 
 type Doctor = {
@@ -47,6 +48,7 @@ export default async function DoctorPage({ params }: { params: Promise<{ slug: s
             <strong>{price}</strong>
             <p>Выберите удобное свободное время в календаре врача.</p>
             <Link className="btn primary" href={`/book/${doctor.slug}`}><CalendarDaysIcon /> Выбрать время</Link>
+            <FavoriteDoctorButton doctorId={doctor.id} />
           </aside>
         </section>
 

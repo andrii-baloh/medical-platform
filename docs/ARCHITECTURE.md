@@ -48,7 +48,7 @@ Health data and directly identifying patient data remain in the selected cell. A
 4. Scheduling
 5. Appointments
 6. Consultations and signed medical results
-7. Medical documents and grants
+7. Medical documents, scanning/quarantine and grants
 8. Payments
 9. Notifications
 10. Consents and legal-document versions
@@ -66,8 +66,11 @@ Booking is executed server-side in one database transaction. The API atomically 
 3. API returns a short-lived signed PUT URL with a random storage key containing no patient name.
 4. Client uploads directly to the private bucket.
 5. Client calls `complete`.
-6. API verifies the object with HEAD and marks the document active.
-7. Downloads use short-lived signed GET URLs only after an access check.
-8. Doctor access requires an explicit active `document_grant` and a patient/doctor relationship.
+6. API inspects the object server-side and enforces integrity: declared size vs `HeadObject` content length, declared `Content-Type` vs stored content type, magic-byte sniffing and a recomputed SHA-256. The browser `Content-Type` is never trusted on its own.
+7. On any integrity mismatch the document is moved to `quarantined` with `scan_status='error'` and stays unavailable. On success the document becomes `quarantined` with `scan_status='pending'`, and a leased row in `document_scan_jobs` is enqueued.
+8. The scan worker runs the configured `DOCUMENT_SCANNER` provider (`development-pass` locally, `clamav` for real scanning). The verdict is `clean | infected | error`.
+9. Only a `clean` verdict promotes the document to `status='active'`, `scan_status='clean'`. `infected` keeps it `quarantined` with `scan_status='infected'`; `error` (verdict, exception or lease failure) keeps it `quarantined` with `scan_status='error'`. Neither state allows download or doctor access.
+10. Downloads use short-lived signed GET URLs only after an access check.
+11. Doctor access is a separate boundary: even an `active`/`clean` document is not visible to a doctor without an explicit `document_grants` row (created by the patient, optional `expires_at`, revocable via `revoked_at`) and a patient/doctor relationship.
 
-For production, add malware scanning/quarantine before step 6 and provider-side KMS/envelope encryption.
+Production still requires provider-side KMS/envelope encryption and an object versioning/retention policy.

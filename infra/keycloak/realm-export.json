@@ -2,37 +2,32 @@
   "realm": "medicare",
   "enabled": true,
   "displayName": "MediCare",
+  "sslRequired": "external",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "rememberMe": false,
   "verifyEmail": false,
-  "loginWithEmailAllowed": true,
-  "duplicateEmailsAllowed": false,
-  "sslRequired": "external",
   "bruteForceProtected": true,
   "permanentLockout": false,
-  "maxFailureWaitSeconds": 900,
   "failureFactor": 5,
+  "maxFailureWaitSeconds": 900,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ru", "de", "en"],
+  "defaultLocale": "ru",
   "roles": {
     "realm": [
-      {
-        "name": "patient",
-        "description": "Patient"
-      },
-      {
-        "name": "doctor",
-        "description": "Verified doctor"
-      },
-      {
-        "name": "admin",
-        "description": "Platform administrator"
-      }
+      { "name": "patient", "description": "Patient" },
+      { "name": "doctor", "description": "Verified doctor" },
+      { "name": "admin", "description": "Platform administrator" }
     ]
   },
-  "defaultRoles": [
-    "patient"
-  ],
+  "defaultRoles": ["patient"],
   "clients": [
     {
       "clientId": "medicare-api",
@@ -52,10 +47,12 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/api/auth/callback/keycloak"
+        "http://localhost:3000/api/auth/callback/keycloak",
+        "http://127.0.0.1:3000/api/auth/callback/keycloak"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
@@ -85,15 +82,9 @@
       "firstName": "Анна",
       "lastName": "Волкова",
       "credentials": [
-        {
-          "type": "password",
-          "value": "Doctor123!",
-          "temporary": false
-        }
+        { "type": "password", "value": "Doctor123!", "temporary": false }
       ],
-      "realmRoles": [
-        "doctor"
-      ]
+      "realmRoles": ["doctor"]
     },
     {
       "id": "66666666-6666-6666-6666-666666666666",
@@ -104,15 +95,22 @@
       "firstName": "Ирина",
       "lastName": "Соколова",
       "credentials": [
-        {
-          "type": "password",
-          "value": "Patient123!",
-          "temporary": false
-        }
+        { "type": "password", "value": "Patient123!", "temporary": false }
       ],
-      "realmRoles": [
-        "patient"
-      ]
+      "realmRoles": ["patient"]
+    },
+    {
+      "id": "77777777-7777-7777-7777-777777777777",
+      "username": "admin@medicare.local",
+      "email": "admin@medicare.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "Admin",
+      "credentials": [
+        { "type": "password", "value": "Admin123!", "temporary": false }
+      ],
+      "realmRoles": ["admin"]
     }
   ]
 }

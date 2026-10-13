@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, CreditCardIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
+import { AppointmentRating } from "@/components/AppointmentRating";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { browserApi } from "@/lib/api";
 
@@ -162,6 +163,8 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
       {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />}
 
       {result ? <ResultSection result={result} /> : appointment.status === "completed" ? <div className="notice">Врач ещё не опубликовал подписанное заключение.</div> : null}
+
+      {appointment.status === "completed" && <AppointmentRating appointmentId={appointmentId} />}
 
       {versions.length > 1 && <section className="card result-history-card"><span className="eyebrow">История</span><h2>Подписанные версии</h2><div className="version-list">{versions.map((item) => <details key={item.version}><summary>Версия {item.version} · {new Date(item.signedAt).toLocaleString("ru-RU")}</summary><p>{item.assessment || "Без текста заключения"}</p><code>{item.contentSha256}</code></details>)}</div></section>}
     </div>

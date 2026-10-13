@@ -8,7 +8,8 @@ ON CONFLICT DO NOTHING;
 INSERT INTO app_users(id,identity_subject,email,full_name,locale,timezone,country_code)
 VALUES
   ('dddddddd-dddd-dddd-dddd-dddddddddd01','55555555-5555-5555-5555-555555555555','doctor@medicare.local','Анна Волкова','ru','Europe/Berlin',null),
-  ('dddddddd-dddd-dddd-dddd-dddddddddd02','66666666-6666-6666-6666-666666666666','patient@medicare.local','Ирина Соколова','ru','Europe/Berlin',null)
+  ('dddddddd-dddd-dddd-dddd-dddddddddd02','66666666-6666-6666-6666-666666666666','patient@medicare.local','Ирина Соколова','ru','Europe/Berlin',null),
+  ('dddddddd-dddd-dddd-dddd-dddddddddd03','77777777-7777-7777-7777-777777777777','admin@medicare.local','Local Admin','ru','Europe/Berlin',null)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO user_roles(user_id,role)
@@ -16,6 +17,9 @@ SELECT id,'doctor' FROM app_users WHERE identity_subject='55555555-5555-5555-555
 ON CONFLICT DO NOTHING;
 INSERT INTO user_roles(user_id,role)
 SELECT id,'patient' FROM app_users WHERE identity_subject='66666666-6666-6666-6666-666666666666'
+ON CONFLICT DO NOTHING;
+INSERT INTO user_roles(user_id,role)
+SELECT id,'admin' FROM app_users WHERE identity_subject='77777777-7777-7777-7777-777777777777'
 ON CONFLICT DO NOTHING;
 
 UPDATE doctor_profiles

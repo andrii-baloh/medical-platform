@@ -13,15 +13,23 @@ type Me = {
   roles: string[];
   patientProfiles: { id: string; fullName: string; relationToOwner: string }[];
 };
+type FavoriteDoctor = { id: string; slug: string; fullName: string; specialty: string; rating: number; reviewCount: number; initials?: string | null };
 type ApiError = Error & { status?: number };
 
 export function ProfileClient() {
   const [me, setMe] = useState<Me | null>(null);
+  const [favorites, setFavorites] = useState<FavoriteDoctor[]>([]);
   const [needLogin, setNeedLogin] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    browserApi<Me>("/me").then(setMe).catch((error: ApiError) => {
+    Promise.all([
+      browserApi<Me>("/me"),
+      browserApi<FavoriteDoctor[]>("/engagement/favorites").catch(() => []),
+    ]).then(([profile, favoriteDoctors]) => {
+      setMe(profile);
+      setFavorites(favoriteDoctors);
+    }).catch((error: ApiError) => {
       if (error.status === 401) setNeedLogin(true);
       else setMessage("Не удалось загрузить профиль.");
     });
@@ -49,6 +57,14 @@ export function ProfileClient() {
         <div className="section-head"><div><span className="eyebrow">Семья</span><h2>Профили пациентов</h2></div></div>
         <div className="family-list">
           {me.patientProfiles.map((profile) => <div className="family-row" key={profile.id}><div className="family-avatar">{profile.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><b>{profile.fullName}</b><span>{profile.relationToOwner === "self" ? "Основной профиль" : profile.relationToOwner}</span></div></div>)}
+        </div>
+      </section>
+
+      <section className="card profile-favorites-card">
+        <div className="section-head"><div><span className="eyebrow">Избранное</span><h2>Любимые специалисты</h2></div></div>
+        <div className="profile-favorites-list">
+          {favorites.map((doctor) => <a className="profile-favorite-doctor" href={`/doctors/${doctor.slug}`} key={doctor.id}><div className="family-avatar">{doctor.initials || doctor.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div className="grow"><b>{doctor.fullName}</b><span>{doctor.specialty} · {doctor.rating.toFixed(2)} / 5</span></div></a>)}
+          {!favorites.length && <p className="muted">Добавляйте врачей в избранное из карточки специалиста.</p>}
         </div>
       </section>
 

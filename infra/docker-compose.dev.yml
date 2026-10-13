@@ -1,3 +1,5 @@
+# Legacy development compose retained for compatibility.
+# Canonical local architecture is now ../docker-compose.yml.
 services:
   postgres:
     image: postgres:17-alpine
@@ -17,6 +19,7 @@ services:
       - ../db/migrations/007_document_scan_recovery.sql:/docker-entrypoint-initdb.d/007_document_scan_recovery.sql:ro
       - ../db/migrations/008_notification_delivery.sql:/docker-entrypoint-initdb.d/008_notification_delivery.sql:ro
       - ../db/migrations/009_support.sql:/docker-entrypoint-initdb.d/009_support.sql:ro
+      - ../db/migrations/010_patient_engagement.sql:/docker-entrypoint-initdb.d/010_patient_engagement.sql:ro
       - ../db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U medicare -d medicare"]
