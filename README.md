@@ -1,6 +1,6 @@
 # MediCare platform 0.13
 
-Provider-neutral foundation for a multi-country online medical consultation platform.
+Provider-neutral technical foundation being developed as a commercial telemedicine platform for the Russian Federation.
 
 ## Architecture
 
@@ -18,7 +18,11 @@ Provider-neutral foundation for a multi-country online medical consultation plat
 
 The recovered 0.13 tree contains patient/family profiles, doctor catalog and booking, doctor workspace and consultation lifecycle, immutable signed clinical versions, protected document upload/download/grants, video consultation rooms, notifications/outbox, development payments, admin/support surfaces, favorites and appointment ratings.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `010_patient_engagement.sql`.
+Roadmap work after recovery adds a separate medical encounter, patient medical-record aggregation, medical conclusions, immutable medical-document versions, signature abstraction, versioned patient consents, medical-organization data, doctor regulatory credentials, legal representatives, ESIA identity-linking architecture and a dedicated EGISZ integration job boundary.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `023_egisz_integration.sql`. Existing applied migrations must never be edited; add a new migration instead.
+
+The EGISZ integration layer deliberately does not fake a production connection. Real registry/REMD transport must be supplied through the adapter boundary after the selected integration contract, test environment and credentials/certificates are known.
 
 ## Local development
 
@@ -51,7 +55,7 @@ npm run build
 docker compose --env-file .env.example config --quiet
 ```
 
-The migration runner records SHA-256 checksums in `schema_migrations`. Existing applied migrations must never be edited; add a new migration instead.
+The migration runner records SHA-256 checksums in `schema_migrations`.
 
 ## Security boundary
 

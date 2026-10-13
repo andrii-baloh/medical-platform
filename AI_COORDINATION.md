@@ -61,3 +61,13 @@ Docker runtime remains blocked by the machine's current WSL/Docker Desktop start
 - Do not log access tokens, video tokens, secrets or clinical free text.
 - Do not delete named Docker volumes as a troubleshooting shortcut.
 - Do not overwrite the recovery backups on `D:\MedicalPlatformRecovery`.
+
+## Roadmap handoff — 2026-10-13
+
+The current merged source contains the Russian-market roadmap foundations through stage 10: medical encounter/lifecycle, medical record, medical conclusions, immutable medical-document versions, signature abstraction, versioned consents, medical organizations, doctor regulatory credentials, legal representatives and ESIA identity-linking architecture (`012`–`022`).
+
+Stage 11 adds a separate `integrations/egisz` boundary and migration `023_egisz_integration.sql` with durable `IntegrationJob`, `IntegrationEvent`, `IntegrationError` and `IntegrationRetry` storage. The REMD adapter targets immutable `medical_document_versions`, not mutable document heads. Manual integration-job administration is admin-only and idempotency-protected; worker lifecycle methods keep retries and errors out of medical-domain services.
+
+No fake production EGISZ success path is allowed. A real EGISZ/REMD transport adapter must only be wired when the selected integration contract, endpoint, credentials/certificates and test environment are known. Until then the provider interfaces remain explicit boundaries rather than demo network calls.
+
+Next roadmap item after stage 11 validation is stage 12 REMD workflow. Extend the existing `medical_document_registrations` model instead of creating a parallel document-registration system.

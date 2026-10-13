@@ -28,6 +28,7 @@ import { MedicalOrganizationsModule } from "./medical-organizations/medical-orga
 import { DoctorRegulatoryModule } from "./doctor-regulatory/doctor-regulatory.module";
 import { RepresentativesModule } from "./representatives/representatives.module";
 import { EsiaIdentityModule } from "./identity/esia-identity.module";
+import { EgiszIntegrationModule } from "./integrations/egisz/egisz-integration.module";
 import { validateEnv } from "./config/env";
-@Module({imports:[ConfigModule.forRoot({isGlobal:true,validate:validateEnv}),RequestContextModule,DbModule,AuthModule,AuditModule,UsersModule,DoctorsModule,AppointmentsModule,DocumentsModule,DoctorWorkspaceModule,VideoModule,PatientResultsModule,NotificationsModule,OutboxModule,PaymentsModule,AdminModule,SupportModule,EngagementModule,PatientProfilesModule,MedicalEncountersModule,MedicalRecordsModule,MedicalConclusionsModule,SignaturesModule,ConsentsModule,MedicalOrganizationsModule,DoctorRegulatoryModule,RepresentativesModule,EsiaIdentityModule],controllers:[HealthController]})
+@Module({imports:[ConfigModule.forRoot({isGlobal:true,validate:validateEnv}),RequestContextModule,DbModule,AuthModule,AuditModule,UsersModule,DoctorsModule,AppointmentsModule,DocumentsModule,DoctorWorkspaceModule,VideoModule,PatientResultsModule,NotificationsModule,OutboxModule,PaymentsModule,AdminModule,SupportModule,EngagementModule,PatientProfilesModule,MedicalEncountersModule,MedicalRecordsModule,MedicalConclusionsModule,SignaturesModule,ConsentsModule,MedicalOrganizationsModule,DoctorRegulatoryModule,RepresentativesModule,EsiaIdentityModule,EgiszIntegrationModule],controllers:[HealthController]})
 export class AppModule {}
