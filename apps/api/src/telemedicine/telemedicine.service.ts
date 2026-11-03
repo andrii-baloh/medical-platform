@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { PoolClient } from "pg";
 import type { Principal } from "../auth/principal";
 import { AuditService } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 
@@ -213,7 +214,17 @@ export class TelemedicineService {
     if (!row) throw new NotFoundException("Appointment not found");
     const isDoctor = Boolean(row.doctor_user_id) && row.doctor_user_id === user.id && row.doctor_verified;
     const isPatient = row.patient_owner_user_id === user.id;
-    if (!isDoctor && !isPatient) throw new ForbiddenException("Not a participant of this appointment");
+    if (!isDoctor && !isPatient) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.TELEMEDICINE_ACCESS_DENIED,
+        resourceType: "appointment",
+        resourceId: appointmentId,
+        outcome: "denied",
+      });
+      throw new ForbiddenException("Not a participant of this appointment");
+    }
     return { user, role: (isDoctor ? "doctor" : "patient") as "doctor" | "patient" };
   }
 

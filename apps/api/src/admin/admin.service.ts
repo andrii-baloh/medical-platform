@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Principal } from "../auth/principal";
 import { AuditService } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 
@@ -18,12 +19,30 @@ export class AdminService {
 
   private async requireAdmin(principal: Principal) {
     const user = await this.users.ensureAccount(principal);
-    if (!principal.roles.includes("admin")) throw new ForbiddenException("Admin role required");
+    if (!principal.roles.includes("admin")) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.ADMIN_ACCESS_DENIED,
+        resourceType: "admin_area",
+        outcome: "denied",
+      });
+      throw new ForbiddenException("Admin role required");
+    }
     const { rows } = await this.db.query<{ ok: number }>(
       `select 1 ok from user_roles where user_id=$1 and role='admin'`,
       [user.id],
     );
-    if (!rows[0]) throw new ForbiddenException("Admin role required");
+    if (!rows[0]) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.ADMIN_ACCESS_DENIED,
+        resourceType: "admin_area",
+        outcome: "denied",
+      });
+      throw new ForbiddenException("Admin role required");
+    }
     return user;
   }
 

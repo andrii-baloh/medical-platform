@@ -16,6 +16,11 @@ export const AUDIT_EVENT = {
   CONSULTATION_OPENED: "consultation.opened",
   /** Trusted role set of an account changed after token verification. */
   USER_ROLE_CHANGED: "user.role.changed",
+  /** Authorization refusals; always written with outcome "denied". */
+  DOCUMENT_ACCESS_DENIED: "document.access.denied",
+  CONSULTATION_ACCESS_DENIED: "consultation.access.denied",
+  TELEMEDICINE_ACCESS_DENIED: "telemedicine.access.denied",
+  ADMIN_ACCESS_DENIED: "admin.access.denied",
 } as const;
 
 export type AuditEventName = (typeof AUDIT_EVENT)[keyof typeof AUDIT_EVENT];

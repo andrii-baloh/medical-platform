@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import type { Principal } from "../auth/principal";
 import { AuditService } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import type { AttachDocumentDto, ChatMessageDto } from "./consultation-material.dto";
@@ -72,7 +73,19 @@ export class ConsultationMaterialsService {
 
     const isDoctor = Boolean(encounter.doctor_user_id) && encounter.doctor_user_id === user.id && encounter.doctor_verified;
     const isPatient = encounter.patient_owner_user_id === user.id;
-    if (!isDoctor && !isPatient) throw new ForbiddenException("Not a participant of this consultation");
+    if (!isDoctor && !isPatient) {
+      // A refused access attempt is an auditable security event.
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.CONSULTATION_ACCESS_DENIED,
+        resourceType: "medical_encounter",
+        resourceId: encounter.encounter_id,
+        outcome: "denied",
+        metadata: { appointmentId },
+      });
+      throw new ForbiddenException("Not a participant of this consultation");
+    }
 
     return { user, encounter, role: (isDoctor ? "doctor" : "patient") as "doctor" | "patient" };
   }

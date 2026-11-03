@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import { AuditService } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import type { Principal } from "../auth/principal";
 import { MAX_UPLOAD_BYTES } from "./document.dto";
 import type { CompleteUploadDto, CreateUploadIntentDto, GrantDocumentDto } from "./document.dto";
@@ -183,7 +184,17 @@ export class DocumentsService {
     );
     const doc = rows[0];
     if (!doc) throw new NotFoundException("Document not found");
-    if (!doc.is_owner && !doc.has_doctor_grant) throw new ForbiddenException("Document access denied");
+    if (!doc.is_owner && !doc.has_doctor_grant) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.DOCUMENT_ACCESS_DENIED,
+        resourceType: "medical_document",
+        resourceId: documentId,
+        outcome: "denied",
+      });
+      throw new ForbiddenException("Document access denied");
+    }
     const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: doc.storage_key }), { expiresIn: this.ttl });
     await this.db.query(
       `insert into medical_document_access_logs(document_id,document_version_id,actor_user_id,action)
@@ -207,7 +218,17 @@ export class DocumentsService {
     );
     const document = access.rows[0];
     if (!document) throw new NotFoundException("Document not found");
-    if (!document.is_owner && !document.has_doctor_grant) throw new ForbiddenException("Document access denied");
+    if (!document.is_owner && !document.has_doctor_grant) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorSubject: principal.sub,
+        action: AUDIT_EVENT.DOCUMENT_ACCESS_DENIED,
+        resourceType: "medical_document",
+        resourceId: documentId,
+        outcome: "denied",
+      });
+      throw new ForbiddenException("Document access denied");
+    }
     const { rows } = await this.db.query(
       `select id,version_no,original_name,mime_type,size_bytes,sha256_hex,category,metadata,created_at
        from medical_document_versions where document_id=$1 order by version_no desc`,
