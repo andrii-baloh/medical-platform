@@ -53,8 +53,11 @@ The current source also contains:
 - telemedicine session bound to `appointment → medical encounter` with its own lifecycle and timeline
 - session join timestamps, connection-loss/technical events and recording state (54-ФЗ not implied)
 - session state surfaced in the video call panel for both patient and doctor
+- consultation chat and materials bound to the medical encounter (`consultation_materials`)
+- attachment of existing patient documents to a consultation without duplicating storage
+- read-only chat after completion and no clinical text in audit metadata
 
-Database migrations currently run from `001_initial.sql` through `029_telemedicine_sessions.sql`.
+Database migrations currently run from `001_initial.sql` through `030_consultation_materials.sql`.
 
 ## Validation on 2026-11-03
 
@@ -64,10 +67,11 @@ Database migrations currently run from `001_initial.sql` through `029_telemedici
 - infrastructure static validation: PASS after Stage 14 changes
 - `git diff --check`: PASS
 - Stage 15: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
+- Stage 16: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
 
 ## Runtime status for this change
 
-Docker CLI and PostgreSQL are not installed on the HP workstation used for this change. Therefore migrations `028` and `029`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
+Docker CLI and PostgreSQL are not installed on the HP workstation used for this change. Therefore migrations `028`–`030`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
 
 ## Fiscalization boundary status
 
@@ -99,10 +103,10 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 15, the next unfinished roadmap item is Stage 16: consultation chat and materials
-(`ConsultationMaterial` for files, images, chat, voice, video and measurements) with a retention
-policy hook. Extend the existing documents/encounter model instead of creating a parallel storage
-subsystem.
+After Stage 16, the next unfinished roadmap item is Stage 17: retention. Data classes must be
+defined first (consultation materials, medical documents, audit logs, security logs, payment
+records, consent records), then deletion becomes policy-based, controlled and journaled. Do not
+add a bare cron that deletes medical data.
 
 ## Not production-complete
 

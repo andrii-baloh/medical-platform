@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeftIcon, CalendarDaysIcon, CheckBadgeIcon, ClockIcon, DocumentCheckIcon, UserIcon } from "@heroicons/react/24/outline";
 import { AppointmentRating } from "@/components/AppointmentRating";
 import { CommercialCheckoutCard } from "@/components/CommercialCheckoutCard";
+import { ConsultationChat } from "@/components/ConsultationChat";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { patientRequest as browserApi } from "@/components/patientRequest";
 
@@ -134,6 +135,8 @@ export function ConsultationDetailClient({ appointmentId }: { appointmentId: str
       <CommercialCheckoutCard appointmentId={appointmentId} />
 
       {["confirmed", "patient_checked_in", "in_progress"].includes(appointment.status) && <VideoCallPanel appointmentId={appointmentId} startsAt={appointment.startsAt} joinPath={`/video/appointments/${appointmentId}/join`} />}
+
+      {["confirmed", "patient_checked_in", "in_progress", "completed"].includes(appointment.status) && <ConsultationChat appointmentId={appointmentId} />}
 
       {result ? <ResultSection result={result} /> : appointment.status === "completed" ? <div className="notice">Врач ещё не опубликовал подписанное заключение.</div> : null}
 

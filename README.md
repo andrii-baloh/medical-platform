@@ -26,7 +26,9 @@ Stage 14 adds the production payment and fiscal contour: a Robokassa adapter bui
 
 Stage 15 adds the telemedicine session as a clinical entity on top of the existing LiveKit room: the session is bound to the appointment and medical encounter, keeps join evidence, a connection-loss counter, technical and recording state, and an append-only timeline. The LiveKit provider boundary, `video_rooms` and the join-window rules are unchanged. See `docs/TELEMEDICINE_SESSION.md`.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `029_telemedicine_sessions.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Stage 16 adds consultation chat and materials bound to the medical encounter: text messages and attachments (file, image, voice, video) in one `consultation_materials` table, reusing the existing `medical_documents` + MinIO + ClamAV pipeline for real files. The consultation is writable while it is active and read-only after completion. See `docs/CONSULTATION_MATERIALS.md`.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `030_consultation_materials.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 

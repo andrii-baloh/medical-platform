@@ -121,3 +121,15 @@ Recording is deliberately state-only: no egress, no recording storage, no playba
 Not verified: migration `029` execution on PostgreSQL, a real LiveKit room lifecycle against a running SFU, and the recording integration. Docker and PostgreSQL remain unavailable on this workstation.
 
 Next roadmap item is Stage 16 consultation chat and materials: extend the existing document/encounter model with `ConsultationMaterial` rather than adding a parallel storage subsystem.
+
+## Stage 16 handoff — consultation chat and materials — 2026-11-03
+
+Stage 16 adds migration `030_consultation_materials.sql`. Every chat message and every attached material carries both `encounter_id` and `appointment_id`, so nothing can exist outside a medical case. Files are not duplicated: `medical_documents`, MinIO and the ClamAV pipeline stay the only storage path, and `consultation_materials.document_id` only classifies and links an existing document.
+
+The API (`/v1/consultation-materials/appointments/:id`, `/chat`, `/documents`) resolves the caller through the encounter. A consultation is writable while the encounter is `scheduled`, `waiting` or `active` and becomes read-only after completion, cancellation or no-show. When an appointment exists but the encounter has not been created yet the API returns `409` instead of silently creating a clinical case. Attaching a document requires that the actor can already read it (owner or active doctor grant) and that it belongs to the same patient. Chat text is medical free text and is deliberately excluded from audit metadata.
+
+The web app mounts `ConsultationChat` on both the patient consultation page and the doctor consultation workspace; the doctor side can attach documents from the patient's document list. Retention and deletion are explicitly out of scope (Stage 17), and no recording engine was added.
+
+Not verified: migration `030` execution on PostgreSQL and a real two-party chat against the Docker stack. Typecheck, build, infrastructure validation and API boot (routes mapped) passed.
+
+Next roadmap item is Stage 17 retention: classify data first, then apply policy-based, journaled deletion on top of the existing tables.

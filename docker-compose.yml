@@ -43,6 +43,7 @@ services:
       - ./db/migrations/027_payment_fiscalization.sql:/docker-entrypoint-initdb.d/027_payment_fiscalization.sql:ro
       - ./db/migrations/028_payment_fiscal_lifecycle.sql:/docker-entrypoint-initdb.d/028_payment_fiscal_lifecycle.sql:ro
       - ./db/migrations/029_telemedicine_sessions.sql:/docker-entrypoint-initdb.d/029_telemedicine_sessions.sql:ro
+      - ./db/migrations/030_consultation_materials.sql:/docker-entrypoint-initdb.d/030_consultation_materials.sql:ro
       - ./db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-medicare} -d ${POSTGRES_DB:-medicare}"]

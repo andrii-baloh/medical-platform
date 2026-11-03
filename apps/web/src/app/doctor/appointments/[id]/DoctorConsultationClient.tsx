@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useEffect, useState } from "react";
 import { ArrowLeftIcon, DocumentTextIcon, UserIcon } from "@heroicons/react/24/outline";
 import { staffRequest as browserApi, StaffLoadState, useStaffResource } from "@/components/StaffRequest";
+import { ConsultationChat } from "@/components/ConsultationChat";
 import { VideoCallPanel } from "@/components/VideoCallPanel";
 import { formatDate, formatDateTime, statusLabel } from "@/lib/format";
 
@@ -96,6 +97,8 @@ export function DoctorConsultationClient({ appointmentId }: { appointmentId: str
       <StaffLoadState loading={loading} error={loadError} retry={() => void load()} />
       {message && <div role="alert" className="notice">{message}</div>}
       {["confirmed", "patient_checked_in", "in_progress"].includes(data.status) && <VideoCallPanel key={appointmentId} appointmentId={appointmentId} startsAt={data.startsAt} joinPath={`/video/doctor/appointments/${appointmentId}/join`} title="Видеоконсультация с пациентом" />}
+
+      {["confirmed", "patient_checked_in", "in_progress", "completed"].includes(data.status) && <ConsultationChat appointmentId={appointmentId} request={browserApi} title="Чат с пациентом" attachableDocuments={data.documents.map((document) => ({ id: document.id, originalName: document.originalName }))} />}
 
       <div className="consult-grid consult-grid-v2">
         <section className="stack">

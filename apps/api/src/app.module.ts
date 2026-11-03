@@ -31,6 +31,7 @@ import { EsiaIdentityModule } from "./identity/esia-identity.module";
 import { EgiszIntegrationModule } from "./integrations/egisz/egisz-integration.module";
 import { CommercialServicesModule } from "./commercial-services/commercial-services.module";
 import { TelemedicineModule } from "./telemedicine/telemedicine.module";
+import { ConsultationMaterialsModule } from "./consultation-materials/consultation-materials.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -66,6 +67,7 @@ import { validateEnv } from "./config/env";
     EgiszIntegrationModule,
     CommercialServicesModule,
     TelemedicineModule,
+    ConsultationMaterialsModule,
   ],
   controllers: [HealthController],
 })
