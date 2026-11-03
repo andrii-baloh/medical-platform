@@ -133,3 +133,15 @@ The web app mounts `ConsultationChat` on both the patient consultation page and 
 Not verified: migration `030` execution on PostgreSQL and a real two-party chat against the Docker stack. Typecheck, build, infrastructure validation and API boot (routes mapped) passed.
 
 Next roadmap item is Stage 17 retention: classify data first, then apply policy-based, journaled deletion on top of the existing tables.
+
+## Stage 17 handoff — retention — 2026-11-03
+
+Stage 17 adds migration `031_retention_policies.sql` and deliberately invents no retention periods. `retention_policies` stores one row per roadmap data class with `retention_days`, `action`, `legal_basis` and `active`, and a database CHECK refuses an active policy without a period and a legal basis. `retention_runs` records every preview/execution with cutoff and counters (one running execution per class), and `retention_deletion_log` records every removed or soft-deleted object, so deletion is journaled rather than silent.
+
+Only classes with a real executor can be processed: consultation materials are deleted row by row after the cutoff, and medical documents are soft-deleted (`status='deleted'`) without touching storage objects or immutable version history. Audit logs, security logs, payment records and consent records keep their policy rows but execution is refused with an explicit reason — these require a documented legal/accounting procedure, not a cron job. The admin API exposes list/configure/preview/run/runs; every policy change and run is also written to `audit_events`.
+
+`RetentionWorker` is disabled by default and bounded by batch settings. No admin UI is provided yet, and no storage-object purge exists.
+
+Not verified: migration `031` execution on PostgreSQL and any destructive run against real data. Typecheck, build, infrastructure validation and API boot passed.
+
+Next roadmap item is Stage 18 audit expansion: extend the existing `audit_events` stream with the event catalogue from the brief (record opened, document viewed/downloaded/modified, signature created, consent signed, payment operation, role change, representative access) without copying clinical text.

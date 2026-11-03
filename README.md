@@ -28,7 +28,9 @@ Stage 15 adds the telemedicine session as a clinical entity on top of the existi
 
 Stage 16 adds consultation chat and materials bound to the medical encounter: text messages and attachments (file, image, voice, video) in one `consultation_materials` table, reusing the existing `medical_documents` + MinIO + ClamAV pipeline for real files. The consultation is writable while it is active and read-only after completion. See `docs/CONSULTATION_MATERIALS.md`.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `030_consultation_materials.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Stage 17 adds the retention policy registry: policy rows per data class with an explicit period and legal basis, journaled runs, a deletion log, dry-run preview and a worker that is disabled by default. The platform invents no retention periods and only executes classes that have a real, approved disposal procedure. See `docs/RETENTION.md`.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 

@@ -56,8 +56,11 @@ The current source also contains:
 - consultation chat and materials bound to the medical encounter (`consultation_materials`)
 - attachment of existing patient documents to a consultation without duplicating storage
 - read-only chat after completion and no clinical text in audit metadata
+- retention policy registry with explicit period and legal basis, journaled runs and a deletion log
+- preview (dry-run) and a retention worker that is disabled by default
+- automatic retention only for consultation materials and medical-document soft delete; auditing, payment and consent classes refuse execution
 
-Database migrations currently run from `001_initial.sql` through `030_consultation_materials.sql`.
+Database migrations currently run from `001_initial.sql` through `031_retention_policies.sql`.
 
 ## Validation on 2026-11-03
 
@@ -68,10 +71,11 @@ Database migrations currently run from `001_initial.sql` through `030_consultati
 - `git diff --check`: PASS
 - Stage 15: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 16: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
+- Stage 17: API typecheck PASS, production build PASS, infrastructure validation PASS
 
 ## Runtime status for this change
 
-Docker CLI and PostgreSQL are not installed on the HP workstation used for this change. Therefore migrations `028`–`030`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
+Docker CLI and PostgreSQL are not installed on the HP workstation used for this change. Therefore migrations `028`–`031`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
 
 ## Fiscalization boundary status
 
@@ -103,10 +107,10 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 16, the next unfinished roadmap item is Stage 17: retention. Data classes must be
-defined first (consultation materials, medical documents, audit logs, security logs, payment
-records, consent records), then deletion becomes policy-based, controlled and journaled. Do not
-add a bare cron that deletes medical data.
+After Stage 17, the next unfinished roadmap item is Stage 18: audit expansion. Extend the existing
+`audit_events` stream with the event catalogue from the brief (patient record opened, document
+viewed/downloaded/modified, signature created, consent signed, payment operation, admin action,
+role change, representative access) while keeping clinical free text out of audit metadata.
 
 ## Not production-complete
 
@@ -118,6 +122,7 @@ add a bare cron that deletes medical data.
 - tested production backup/restore and disaster recovery
 - production observability/alerting and security scanning
 - telemedicine session recording/egress (state only today)
+- configured retention policies with a customer-approved legal basis, storage-aware document purge and legal hold
 - retention/deletion policy implementation
 - final Russian legal/compliance validation for the selected deployment and medical organization
 

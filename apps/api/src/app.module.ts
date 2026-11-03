@@ -32,6 +32,7 @@ import { EgiszIntegrationModule } from "./integrations/egisz/egisz-integration.m
 import { CommercialServicesModule } from "./commercial-services/commercial-services.module";
 import { TelemedicineModule } from "./telemedicine/telemedicine.module";
 import { ConsultationMaterialsModule } from "./consultation-materials/consultation-materials.module";
+import { RetentionModule } from "./retention/retention.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -68,6 +69,7 @@ import { validateEnv } from "./config/env";
     CommercialServicesModule,
     TelemedicineModule,
     ConsultationMaterialsModule,
+    RetentionModule,
   ],
   controllers: [HealthController],
 })
