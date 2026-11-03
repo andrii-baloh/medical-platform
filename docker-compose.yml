@@ -46,6 +46,7 @@ services:
       - ./db/migrations/030_consultation_materials.sql:/docker-entrypoint-initdb.d/030_consultation_materials.sql:ro
       - ./db/migrations/031_retention_policies.sql:/docker-entrypoint-initdb.d/031_retention_policies.sql:ro
       - ./db/migrations/032_security_incidents.sql:/docker-entrypoint-initdb.d/032_security_incidents.sql:ro
+      - ./db/migrations/033_remote_monitoring.sql:/docker-entrypoint-initdb.d/033_remote_monitoring.sql:ro
       - ./db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-medicare} -d ${POSTGRES_DB:-medicare}"]

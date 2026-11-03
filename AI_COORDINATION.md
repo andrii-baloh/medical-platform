@@ -187,3 +187,21 @@ Deliberate gaps: no admin UI, no deadline reminders/escalation, no regulator int
 Not verified: migration `032` execution and runtime behaviour (no PostgreSQL here).
 
 Next roadmap item is Stage 22 remote patient monitoring: `MonitoringProgram`, `PatientMonitoringEnrollment`, `MedicalDevice`, `Measurement`, `MeasurementThreshold`, `ClinicalAlert`, `MonitoringReview`, built on the existing engagement module and encounter model.
+
+## Stage 22 handoff — remote patient monitoring — 2026-11-03
+
+Stage 22 adds migration `033_remote_monitoring.sql`: programs, enrollments (patient ↔ program ↔ treating doctor, one live enrollment per program/patient), device registry, measurements, thresholds, clinical alerts and monitoring reviews.
+
+Measurements can only be posted into an enrollment, so every value has a program and a doctor. Thresholds are evaluated inside the ingest transaction and an out-of-range value always creates the matching alert; alert text is technical and carries no clinical interpretation. Enrollment requires an existing appointment or encounter relationship between the doctor and the patient, and the treating doctor is resolved from the enrollment for every alert and review action.
+
+Deliberate gaps: no device connectivity, alerts are not delivered through the notification pipeline, no UI, no personal per-patient thresholds, and measurements are not yet a retention data class.
+
+Not verified: migration `033` execution and runtime behaviour (no PostgreSQL here).
+
+This closes the roadmap stages 1–22 in source. The remaining work is production readiness: runtime verification of migrations and workflows, MFA/RBAC/encryption/secrets/backup checks from Stage 19, legal hold and retention recovery, and incident/regulator procedures with the customer.
+
+---
+
+## Roadmap status — source complete, runtime unverified
+
+All twenty-two stages now have source-level implementations, migrations `001`–`033`, dedicated documentation and a per-stage commit. No stage has been executed against a running PostgreSQL/LiveKit/MinIO/ClamAV stack, so no workflow is claimed as end-to-end verified.

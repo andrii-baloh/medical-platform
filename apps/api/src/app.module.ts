@@ -34,6 +34,7 @@ import { TelemedicineModule } from "./telemedicine/telemedicine.module";
 import { ConsultationMaterialsModule } from "./consultation-materials/consultation-materials.module";
 import { RetentionModule } from "./retention/retention.module";
 import { SecurityIncidentsModule } from "./incidents/security-incidents.module";
+import { MonitoringModule } from "./monitoring/monitoring.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -72,6 +73,7 @@ import { validateEnv } from "./config/env";
     ConsultationMaterialsModule,
     RetentionModule,
     SecurityIncidentsModule,
+    MonitoringModule,
   ],
   controllers: [HealthController],
 })

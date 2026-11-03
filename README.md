@@ -38,6 +38,8 @@ Stage 20 documents the Russian deployment cell: reference topology, component re
 
 Stage 21 adds the security incident workflow: `security_incidents` plus an append-only timeline for detection, containment, regulator notification and final report, available through admin-only endpoints and fully audited. See `docs/INCIDENT_RESPONSE.md`.
 
+Stage 22 adds remote patient monitoring: programs, enrollments tied to the treating doctor, measurement ingest with threshold evaluation in the same transaction, clinical alerts, device registry and periodic reviews. See `docs/MONITORING.md`.
+
 Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary

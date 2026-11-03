@@ -66,8 +66,10 @@ The current source also contains:
 - isolated local test contour definition with backup/restore and dependency-audit scripts
 - Russian deployment cell reference topology with component requirements and acceptance criteria
 - security incident register with append-only timeline, containment, reporting deadline and regulator notification fields
+- remote patient monitoring with programs, enrollments, measurements, thresholds, clinical alerts and reviews
+- threshold evaluation inside the measurement transaction, so no out-of-range value exists without an alert
 
-Database migrations currently run from `001_initial.sql` through `032_security_incidents.sql`.
+Database migrations currently run from `001_initial.sql` through `033_remote_monitoring.sql`.
 
 ## Validation on 2026-11-03
 
@@ -83,6 +85,7 @@ Database migrations currently run from `001_initial.sql` through `032_security_i
 - Stage 19: API typecheck PASS, production build PASS, infrastructure validation PASS; no runtime security test executed (Docker absent)
 - Stage 20: documentation only, no code or schema change
 - Stage 21: API typecheck PASS, production build PASS, infrastructure validation PASS; migration 032 not executed (Docker/PostgreSQL absent)
+- Stage 22: API typecheck PASS, production build PASS, infrastructure validation PASS; migration 033 not executed
 
 ## Runtime status for this change
 
@@ -118,9 +121,11 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 21, the next unfinished roadmap item is Stage 22: remote patient monitoring
-(programs, enrollments, devices, measurements, thresholds, clinical alerts and reviews), built on
-the existing engagement and encounter model.
+The roadmap stages 1–22 are source-complete. The next work is production readiness, not a new
+stage: runtime verification of migrations `001`–`033` and the clinical workflows against an
+isolated Docker contour, closing the Stage 19 security blockers (MFA, RBAC, encryption, secrets,
+verified restore, session revocation, protected logging), legal hold and retention-run recovery,
+and customer sign-off on the Russian deployment cell.
 
 ## Not production-complete
 
