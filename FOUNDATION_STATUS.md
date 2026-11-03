@@ -64,6 +64,7 @@ The current source also contains:
 - denied access attempts audited at document, consultation, telemedicine and admin boundaries
 - API baseline security headers and a production configuration guard
 - isolated local test contour definition with backup/restore and dependency-audit scripts
+- Russian deployment cell reference topology with component requirements and acceptance criteria
 
 Database migrations currently run from `001_initial.sql` through `031_retention_policies.sql`.
 
@@ -79,6 +80,7 @@ Database migrations currently run from `001_initial.sql` through `031_retention_
 - Stage 17: API typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 18: API typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 19: API typecheck PASS, production build PASS, infrastructure validation PASS; no runtime security test executed (Docker absent)
+- Stage 20: documentation only, no code or schema change
 
 ## Runtime status for this change
 
@@ -114,9 +116,9 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 19, the next unfinished roadmap item is Stage 20: data localization. The production
-deployment must keep personal data in Russian infrastructure (database, object storage, backups,
-logs, LiveKit), with the provider chosen together with the customer.
+After Stage 20, the next unfinished roadmap item is Stage 21: incident response
+(`SecurityIncident` with timeline, containment, reporting deadline and regulator notification),
+built on the existing admin and audit patterns.
 
 ## Not production-complete
 

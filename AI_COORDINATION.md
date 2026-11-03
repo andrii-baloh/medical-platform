@@ -167,3 +167,11 @@ Not implemented and deliberately blocked: MFA end-to-end verification, RBAC matr
 Legal hold (Stage 17) and abandoned retention-run recovery remain mandatory blockers, listed in `docs/RETENTION.md` and `docs/SECURITY.md`.
 
 Next roadmap item is Stage 20 data localization: deployment architecture for Russian infrastructure (database, object storage, backups, logs, LiveKit) with a provider chosen by the customer.
+
+## Stage 20 handoff — data localization — 2026-11-03
+
+Stage 20 is an architecture deliverable, not a provisioned environment. `docs/DATA_RESIDENCY.md` now contains the Russian deployment cell reference topology, a component requirement matrix (database, object storage, backups, logs, LiveKit, email/SMS, payments/KKT, identity) with explicit "must not be" constraints, the engineering constraints already enforced in code, and six acceptance criteria.
+
+Nothing was provisioned and no provider was selected; the STRATO VPS was not used. Existing code already supports the topology without changes: `S3_ENDPOINT` and `LIVEKIT_URL` are configuration, payment/fiscal adapters are Russian, and production requires `DEPLOYMENT_COUNTRY` with development placeholders rejected.
+
+Next roadmap item is Stage 21 incident response: `SecurityIncident` with timeline, containment actions, reporting deadline and regulator notification, built on the existing admin/audit patterns.

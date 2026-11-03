@@ -34,6 +34,8 @@ Stage 18 consolidates the audit event catalogue and closes the missing access ev
 
 Stage 19 adds the security baseline: API security headers, a production configuration guard that rejects development placeholders, denied-access audit events, an isolated local test contour, backup/restore scripts and a security inventory with threat model and production blockers. It is explicitly **not** production-ready — see `docs/SECURITY.md`.
 
+Stage 20 documents the Russian deployment cell: reference topology, component requirement matrix and acceptance criteria for database, object storage, backups, logs, LiveKit and integrations. No provider is selected and nothing is provisioned — see `docs/DATA_RESIDENCY.md`.
+
 Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
