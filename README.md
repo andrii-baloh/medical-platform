@@ -24,7 +24,9 @@ Stage 13 adds organization-owned service catalogs and offers, immutable versione
 
 Stage 14 adds the production payment and fiscal contour: a Robokassa adapter built on the MIT `@robokassa/sdk`, raw callback storage with signature outcome, and a provider-neutral KKT boundary that registers the 54-ФЗ final receipt after the consultation is completed. Fiscal attributes are stored only when the KKT operator confirms them; the development adapter records `not_provided` and never fakes a receipt. See `docs/STAGE14_FISCALIZATION.md`.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `028_payment_fiscal_lifecycle.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Stage 15 adds the telemedicine session as a clinical entity on top of the existing LiveKit room: the session is bound to the appointment and medical encounter, keeps join evidence, a connection-loss counter, technical and recording state, and an append-only timeline. The LiveKit provider boundary, `video_rooms` and the join-window rules are unchanged. See `docs/TELEMEDICINE_SESSION.md`.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `029_telemedicine_sessions.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 

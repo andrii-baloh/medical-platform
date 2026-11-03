@@ -14,6 +14,35 @@ type JoinResponse = {
   role: "patient" | "doctor";
 };
 
+type SessionInfo = {
+  status: string;
+  technicalStatus: string;
+  recordingStatus: string;
+  encounterId: string | null;
+  patientJoinedAt: string | null;
+  doctorJoinedAt: string | null;
+  disconnectCount: number;
+};
+
+const sessionStatusLabel: Record<string, string> = {
+  scheduled: "Сессия запланирована",
+  waiting: "Комната открыта, ожидание участников",
+  active: "Сессия идёт",
+  completed: "Сессия завершена",
+  failed: "Технический сбой сессии",
+  cancelled: "Сессия отменена",
+};
+
+const recordingStatusLabel: Record<string, string> = {
+  not_recorded: "Запись не ведётся",
+  requested: "Запись запрошена",
+  recording: "Идёт запись",
+  processing: "Запись обрабатывается",
+  available: "Запись доступна",
+  failed: "Ошибка записи",
+  disabled: "Запись отключена",
+};
+
 type Props = {
   appointmentId: string;
   joinPath: string;
@@ -38,6 +67,8 @@ export function VideoCallPanel({
   const [cameraOn, setCameraOn] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const action = useRef(false);
+  const intentionalLeave = useRef(false);
+  const [session, setSession] = useState<SessionInfo | null>(null);
   const [controlBusy, setControlBusy] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteMediaRef = useRef<HTMLDivElement | null>(null);
@@ -64,6 +95,23 @@ export function VideoCallPanel({
       body: JSON.stringify({ eventType }),
     }).catch(() => undefined);
   }
+
+  async function reportConnectionIssue(event: "reconnecting" | "connection_lost" | "technical_failure") {
+    await browserApi(`/telemedicine/appointments/${appointmentId}/connection-issues`, {
+      method: "POST",
+      body: JSON.stringify({ event }),
+    }).catch(() => undefined);
+  }
+
+  useEffect(() => {
+    // The session only exists after the first successful join, so the panel
+    // re-reads it whenever the call state changes.
+    let active = true;
+    browserApi<SessionInfo | null>(`/telemedicine/appointments/${appointmentId}/session`)
+      .then((value) => { if (active) setSession(value); })
+      .catch(() => { if (active) setSession(null); });
+    return () => { active = false; };
+  }, [appointmentId, state]);
 
   function clearRemoteMedia() {
     if (!remoteMediaRef.current) return;
@@ -94,6 +142,10 @@ export function VideoCallPanel({
     });
     activeRoom.on(RoomEvent.LocalTrackPublished, () => attachLocalCamera(activeRoom));
     activeRoom.on(RoomEvent.Disconnected, () => {
+      // A drop that was not requested by the user is a real session event and
+      // is reported to the backend timeline.
+      if (!intentionalLeave.current) void reportConnectionIssue("connection_lost");
+      intentionalLeave.current = false;
       setState("idle");
       setRoom(null);
       setMicOn(false);
@@ -153,6 +205,7 @@ export function VideoCallPanel({
   async function leave() {
     if (!room) return;
     await control(async () => {
+      intentionalLeave.current = true;
       await room.disconnect();
       clearRemoteMedia();
       setRoom(null);
@@ -176,6 +229,17 @@ export function VideoCallPanel({
           </button>
         )}
       </div>
+
+      {session && (
+        <div className="between row wrap">
+          <small className="muted">
+            {sessionStatusLabel[session.status] ?? session.status}
+            {session.disconnectCount > 0 ? ` · обрывов связи: ${session.disconnectCount}` : ""}
+            {!session.encounterId ? " · медицинский случай ещё не создан" : ""}
+          </small>
+          <small className="muted">{recordingStatusLabel[session.recordingStatus] ?? session.recordingStatus}</small>
+        </div>
+      )}
 
       {message && <div className="notice error" role="alert">{message}</div>}
       {!withinJoinWindow && state !== "connected" && (

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import { AuditService } from "../audit/audit.service";
+import { TelemedicineService } from "../telemedicine/telemedicine.service";
 import type { Principal } from "../auth/principal";
 import { VIDEO_PROVIDER, type VideoParticipantRole, type VideoProvider } from "./video.provider";
 
@@ -61,6 +62,7 @@ export class VideoService {
     private readonly db: DbService,
     private readonly users: UsersService,
     private readonly audit: AuditService,
+    private readonly telemedicine: TelemedicineService,
     @Inject(VIDEO_PROVIDER) private readonly provider: VideoProvider,
   ) {}
 
@@ -126,7 +128,7 @@ export class VideoService {
   /** Get or create the single room bound to this appointment. */
   private async ensureRoom(participant: Participant) {
     let createdProviderRoomId: string | null = null;
-    let result: { room: VideoRoomRow; created: boolean };
+    let result: { room: VideoRoomRow; sessionId: string; created: boolean };
 
     try {
       result = await this.db.tx(async (client) => {
@@ -136,7 +138,13 @@ export class VideoService {
         const existing = await client.query<VideoRoomRow>(`select * from video_rooms where appointment_id = $1`, [participant.appointmentId]);
         if (existing.rows[0]) {
           if (existing.rows[0].status === "closed") throw new ConflictException("The consultation room is closed");
-          return { room: existing.rows[0], created: false };
+          // Rooms created before the telemedicine session existed still get one.
+          const session = await this.telemedicine.ensureForRoomTx(client, {
+            appointmentId: participant.appointmentId,
+            videoRoomId: existing.rows[0].id,
+            provider: existing.rows[0].provider,
+          });
+          return { room: existing.rows[0], sessionId: session.id, created: false };
         }
 
         // Technical room name only: no patient name, no FIO, no raw appointment id.
@@ -149,7 +157,12 @@ export class VideoService {
            returning *`,
           [participant.appointmentId, this.provider.name, created.providerRoomId, roomName, JSON.stringify(created.metadata ?? {})],
         );
-        return { room: inserted.rows[0], created: true };
+        const session = await this.telemedicine.ensureForRoomTx(client, {
+          appointmentId: participant.appointmentId,
+          videoRoomId: inserted.rows[0].id,
+          provider: this.provider.name,
+        });
+        return { room: inserted.rows[0], sessionId: session.id, created: true };
       });
     } catch (error) {
       if (createdProviderRoomId) await this.provider.closeRoom(createdProviderRoomId).catch(() => undefined);
@@ -166,7 +179,7 @@ export class VideoService {
         metadata: { appointmentId: participant.appointmentId, participantRole: participant.role, provider: this.provider.name },
       });
     }
-    return result.room;
+    return result;
   }
 
   async join(principal: Principal, appointmentId: string, expectedRole?: VideoParticipantRole): Promise<VideoJoinResult> {
@@ -175,7 +188,7 @@ export class VideoService {
       throw new ForbiddenException(`This endpoint is reserved for ${expectedRole} participants`);
     }
     this.assertJoinWindow(participant);
-    const room = await this.ensureRoom(participant);
+    const { room, sessionId } = await this.ensureRoom(participant);
 
     const issued = await this.provider.issueToken({
       providerRoomId: room.provider_room_id,
@@ -197,6 +210,9 @@ export class VideoService {
          values ($1,$2,$3,'token_issued',$4::jsonb)`,
         [room.id, participant.userId, participant.role, JSON.stringify({ expiresAt: issued.expiresAt })],
       );
+      // Session timeline: a reachable room is clinical context, not just a token.
+      await this.telemedicine.markRoomOpenedTx(client, sessionId, participant.userId);
+      await this.telemedicine.recordParticipantEventTx(client, sessionId, participant.role, "joined", participant.userId);
     });
 
     // The token itself is never written to audit_events, logs or the database.
@@ -231,7 +247,12 @@ export class VideoService {
     if (room.status === "closed") return { id: room.id, status: room.status };
 
     await this.provider.closeRoom(room.provider_room_id);
-    await this.db.query(`update video_rooms set status='closed', closed_at=now(), updated_at=now() where id=$1`, [room.id]);
+    await this.db.tx(async (client) => {
+      await client.query(`update video_rooms set status='closed', closed_at=now(), updated_at=now() where id=$1`, [room.id]);
+      // Finishing the room ends the clinical session even if the appointment
+      // status has not been switched yet.
+      await this.telemedicine.completeForAppointmentTx(client, appointmentId, "completed");
+    });
     await this.audit.record({
       actorUserId: participant.userId,
       actorSubject: principal.sub,
@@ -246,13 +267,30 @@ export class VideoService {
   /** Record a client-side join/leave so the audit trail is complete. */
   async recordEvent(principal: Principal, appointmentId: string, eventType: "joined" | "left") {
     const participant = await this.requireParticipant(principal, appointmentId);
-    const { rows } = await this.db.query(`select id from video_rooms where appointment_id = $1`, [appointmentId]);
-    if (!rows[0]) throw new NotFoundException("Room not found");
-    await this.db.query(
-      `insert into video_join_events(video_room_id, user_id, participant_role, event_type)
-       values ($1,$2,$3,$4)`,
-      [rows[0].id, participant.userId, participant.role, eventType],
+    const { rows } = await this.db.query<{ id: string; session_id: string | null }>(
+      `select r.id, ts.id session_id
+       from video_rooms r
+       left join telemedicine_sessions ts on ts.video_room_id=r.id
+       where r.appointment_id = $1`,
+      [appointmentId],
     );
+    if (!rows[0]) throw new NotFoundException("Room not found");
+    await this.db.tx(async (client) => {
+      await client.query(
+        `insert into video_join_events(video_room_id, user_id, participant_role, event_type)
+         values ($1,$2,$3,$4)`,
+        [rows[0].id, participant.userId, participant.role, eventType],
+      );
+      if (rows[0].session_id) {
+        await this.telemedicine.recordParticipantEventTx(
+          client,
+          rows[0].session_id,
+          participant.role,
+          eventType,
+          participant.userId,
+        );
+      }
+    });
     return { ok: true };
   }
 }

@@ -108,4 +108,16 @@ Only attributes confirmed by the KKT operator are persisted (FN number, fiscal d
 
 Not done and not claimed: correction receipts, refund receipts, first-receipt attribute tracking (Robokassa issues it with the payment), and any live registration — there is no merchant/KKT test contour on this workstation and Docker/PostgreSQL are unavailable here. Migration `028`, the API typecheck, the Web typecheck and the production build are the only verified artefacts.
 
-Next roadmap item is Stage 15 telemedicine session: bind the existing LiveKit provider to the `appointment → encounter` chain instead of creating a parallel video system.
+Next roadmap item after Stage 14 is Stage 15 telemedicine session: bind the existing LiveKit provider to the `appointment → encounter` chain instead of creating a parallel video system.
+
+## Stage 15 handoff — telemedicine session — 2026-11-03
+
+Stage 15 adds migration `029_telemedicine_sessions.sql` and does not touch the LiveKit provider boundary, `video_rooms`, `video_join_events`, the appointment model or the medical encounter model. A `telemedicine_sessions` row references the appointment, the medical encounter (when one exists) and the transport room, and carries lifecycle status, technical status, recording status, first-join timestamps, start/end time and a disconnect counter.
+
+The session is created inside the same transaction that provisions the room, so a room can never exist without a clinical session; rooms created before this migration receive a session on their next join. Join and leave are appended to `telemedicine_session_events`, unexpected disconnects are reported by the client as `connection_lost`, and technical failures are recorded separately so a weak network does not look like a missed appointment. Completing or cancelling an appointment closes the session even if the doctor never calls the room-close endpoint.
+
+Recording is deliberately state-only: no egress, no recording storage, no playback. `recording_status` stays `not_recorded` and the UI says that recording is not happening. Chat and consultation materials belong to Stage 16, retention to Stage 17.
+
+Not verified: migration `029` execution on PostgreSQL, a real LiveKit room lifecycle against a running SFU, and the recording integration. Docker and PostgreSQL remain unavailable on this workstation.
+
+Next roadmap item is Stage 16 consultation chat and materials: extend the existing document/encounter model with `ConsultationMaterial` rather than adding a parallel storage subsystem.

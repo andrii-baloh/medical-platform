@@ -10,6 +10,7 @@ import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import { AuditService } from "../audit/audit.service";
 import { FiscalReceiptsService } from "../payments/fiscalization/fiscal-receipts.service";
+import { TelemedicineService } from "../telemedicine/telemedicine.service";
 import type { Principal } from "../auth/principal";
 import type { ConsultationDraftDto, CreateDoctorSlotsDto, SetWorkingHoursDto } from "./doctor-workspace.dto";
 
@@ -20,6 +21,7 @@ export class DoctorWorkspaceService {
     private readonly users: UsersService,
     private readonly audit: AuditService,
     private readonly fiscalReceipts: FiscalReceiptsService,
+    private readonly telemedicine: TelemedicineService,
   ) {}
 
   private async requireDoctor(principal: Principal) {
@@ -493,6 +495,9 @@ export class DoctorWorkspaceService {
           [user.id, principal.sub, appointmentId, JSON.stringify({ queued: queuedReceipts })],
         );
       }
+      // A completed appointment ends the telemedicine session even if the room
+      // close call never reached the API.
+      await this.telemedicine.completeForAppointmentTx(client, appointmentId, "completed");
       return { id: appointmentId, status: "completed" };
     });
   }
@@ -518,6 +523,7 @@ export class DoctorWorkspaceService {
       await client.query(`insert into appointment_status_history(appointment_id,from_status,to_status,changed_by_user_id,reason) values ($1,$2,'cancelled_by_doctor',$3,$4)`, [appointmentId, row.status, user.id, reason ?? null]);
       await client.query(`insert into audit_events(actor_user_id,actor_subject,action,resource_type,resource_id) values ($1,$2,'appointment.cancel.doctor','appointment',$3)`, [user.id, principal.sub, appointmentId]);
       await client.query(`insert into outbox_events(aggregate_type,aggregate_id,event_type,payload) values ('appointment',$1,'appointment.cancelled',$2::jsonb)`, [appointmentId, JSON.stringify({ appointmentId, by: "doctor" })]);
+      await this.telemedicine.completeForAppointmentTx(client, appointmentId, "cancelled");
       return { id: appointmentId, status: "cancelled_by_doctor" };
     });
   }
