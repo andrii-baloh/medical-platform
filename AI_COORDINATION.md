@@ -97,3 +97,15 @@ Conceptual architecture was checked against open healthcare service models (Medp
 Stage 13 source/type/build validation passed with 25 Next.js routes. PostgreSQL migration execution and end-to-end payment/contract runtime remain unverified on this HP because Docker/PostgreSQL runtime is unavailable here.
 
 Next roadmap item is Stage 14 payment + KKT/fiscalization. Extend the existing provider abstraction, `payments`, `payment_events` and `refunds`; do not create a second payment subsystem.
+
+## Stage 14 handoff — payments, 54-ФЗ and KKT — 2026-11-03
+
+Stage 14 keeps the existing `payments`/`payment_events`/`refunds` model and adds the fiscal contour on top of it through migration `028_payment_fiscal_lifecycle.sql`. The payment state set now matches the roadmap (`created, pending, authorized, paid, failed, refunded, partially_refunded, cancelled`), inbound provider callbacks are stored in `payment_webhooks` with signature presence/validity, and the previously unused `payment_fiscal_receipts` queue is wired into the application.
+
+Fiscal registration is a separate boundary (`apps/api/src/payments/fiscalization`) with a provider-neutral `FiscalReceiptProvider`, a Robokassa adapter built on the MIT `@robokassa/sdk` (`receipt.sendSecondCheck`, `receipt.getCheckStatus`), and a development adapter that records `not_provided` instead of faking a receipt. The final receipt is queued in the same transaction as appointment completion, so the fiscal duty cannot be lost between commits; the worker uses the same lease/claim/heartbeat pattern as document scanning, retries transport failures and stops on a final KKT decision.
+
+Only attributes confirmed by the KKT operator are persisted (FN number, fiscal document number, fiscal attribute, registration date). Nothing about the receipt is calculated locally, and clinical text is never copied into fiscal payloads or admin read models.
+
+Not done and not claimed: correction receipts, refund receipts, first-receipt attribute tracking (Robokassa issues it with the payment), and any live registration — there is no merchant/KKT test contour on this workstation and Docker/PostgreSQL are unavailable here. Migration `028`, the API typecheck, the Web typecheck and the production build are the only verified artefacts.
+
+Next roadmap item is Stage 15 telemedicine session: bind the existing LiveKit provider to the `appointment → encounter` chain instead of creating a parallel video system.

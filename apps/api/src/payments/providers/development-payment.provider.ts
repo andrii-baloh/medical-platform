@@ -31,7 +31,7 @@ export class DevelopmentPaymentProvider implements PaymentProvider {
     if (!body || typeof body !== "object") throw new UnauthorizedException("Invalid webhook payload");
     const value = body as Record<string, unknown>;
     const status = value.status;
-    const allowed: PaymentStatus[] = ["created","authorized","paid","failed","refunded","partially_refunded"];
+    const allowed: PaymentStatus[] = ["created","pending","authorized","paid","failed","refunded","partially_refunded","cancelled"];
     if (typeof value.eventId !== "string" || typeof value.type !== "string" || typeof value.providerPaymentId !== "string" || typeof status !== "string" || !allowed.includes(status as PaymentStatus)) {
       throw new UnauthorizedException("Invalid development webhook payload");
     }

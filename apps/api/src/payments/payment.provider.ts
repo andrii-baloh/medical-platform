@@ -1,4 +1,12 @@
-export type PaymentStatus = "created" | "authorized" | "paid" | "failed" | "refunded" | "partially_refunded";
+export type PaymentStatus =
+  | "created"
+  | "pending"
+  | "authorized"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "partially_refunded"
+  | "cancelled";
 
 export type CreatePaymentSessionInput = {
   paymentId: string;

@@ -50,15 +50,42 @@ type Payment = {
   checkoutUrl: string | null;
 };
 
+type FiscalReceipt = {
+  id: string;
+  receiptType: string;
+  status: string;
+  fiscal: {
+    fnNumber: string | null;
+    documentNumber: string | null;
+    registeredAt: string | null;
+  } | null;
+};
+
 const missingReason: Record<string, string> = {
   service_offer_missing: "Для этой записи ещё не настроено коммерческое предложение. Оплата заблокирована до настройки услуги и договора.",
   contract_version_missing: "Для услуги ещё не опубликована версия договора. Оплата заблокирована.",
   commercial_offer_inactive: "Коммерческое предложение сейчас недоступно. Оплата заблокирована.",
 };
 
+function receiptStatusText(receipt: FiscalReceipt) {
+  switch (receipt.status) {
+    case "confirmed":
+      return "Итоговый чек зарегистрирован в ККТ";
+    case "submitted":
+    case "processing":
+    case "pending":
+      return "Итоговый чек формируется";
+    case "failed":
+      return "Чек не сформирован — обратитесь в поддержку";
+    default:
+      return "Электронный чек не требуется";
+  }
+}
+
 export function CommercialCheckoutCard({ appointmentId }: { appointmentId: string }) {
   const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [receipts, setReceipts] = useState<FiscalReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -70,13 +97,15 @@ export function CommercialCheckoutCard({ appointmentId }: { appointmentId: strin
     setLoading(true);
     setMessage("");
     try {
-      const [commercial, loadedPayments] = await Promise.all([
+      const [commercial, loadedPayments, loadedReceipts] = await Promise.all([
         patientRequest<Checkout>(`/commercial-services/appointments/${appointmentId}/checkout`),
         patientRequest<Payment[]>(`/payments/appointments/${appointmentId}`),
+        patientRequest<FiscalReceipt[]>(`/payments/appointments/${appointmentId}/receipts`),
       ]);
       if (request !== generation.current) return;
       setCheckout(commercial);
       setPayments(loadedPayments);
+      setReceipts(loadedReceipts);
     } catch {
       if (request === generation.current) setMessage("Не удалось загрузить условия платной медицинской услуги.");
     } finally {
@@ -180,6 +209,14 @@ export function CommercialCheckoutCard({ appointmentId }: { appointmentId: strin
       {checkout.readyForPayment && <div className="commercial-payment-row">
         <div><small>Оплата</small><b>{paid ? "Оплачено" : activePayment ? `Статус: ${activePayment.status}` : "Готово к оплате"}</b>{activePayment?.provider === "development" && <span>Тестовый платёжный провайдер: реального списания нет.</span>}</div>
         {paid ? <span className="signed-badge"><CheckBadgeIcon /> Оплачено</span> : activePayment?.checkoutUrl ? <a className="btn primary" href={activePayment.checkoutUrl}>Перейти к оплате</a> : <button type="button" className="btn primary" disabled={busy} onClick={() => void pay()}>{busy ? "Подготовка…" : "Перейти к оплате"}</button>}
+      </div>}
+
+      {receipts.length > 0 && <div className="commercial-payment-row">
+        <div>
+          <small>Чек ККТ</small>
+          <b>{receiptStatusText(receipts[0])}</b>
+          {receipts[0].fiscal?.documentNumber && <span>ФН {receipts[0].fiscal.fnNumber ?? "—"} · документ {receipts[0].fiscal.documentNumber}{receipts[0].fiscal.registeredAt ? ` · ${new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(receipts[0].fiscal.registeredAt))}` : ""}</span>}
+        </div>
       </div>}
 
       {message && <div className={checkout.readyForPayment ? "notice success" : "notice"} role="status">{message}</div>}

@@ -1,12 +1,16 @@
 import { Body, Controller, Get, Param, Patch, Query } from "@nestjs/common";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { Principal } from "../auth/principal";
+import { FiscalReceiptsService } from "../payments/fiscalization/fiscal-receipts.service";
 import { UpdateDoctorAdminDto } from "./admin.dto";
 import { AdminService } from "./admin.service";
 
 @Controller("admin")
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly fiscalReceipts: FiscalReceiptsService,
+  ) {}
 
   @Get("dashboard")
   dashboard(@CurrentPrincipal() principal: Principal) {
@@ -40,6 +44,11 @@ export class AdminController {
   @Get("payments")
   listPayments(@CurrentPrincipal() principal: Principal) {
     return this.admin.listPayments(principal);
+  }
+
+  @Get("payment-receipts")
+  listPaymentReceipts(@CurrentPrincipal() principal: Principal) {
+    return this.fiscalReceipts.listForAdmin(principal);
   }
 
   @Get("notification-deliveries")

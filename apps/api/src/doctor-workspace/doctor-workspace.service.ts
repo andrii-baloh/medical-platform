@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
 import { AuditService } from "../audit/audit.service";
+import { FiscalReceiptsService } from "../payments/fiscalization/fiscal-receipts.service";
 import type { Principal } from "../auth/principal";
 import type { ConsultationDraftDto, CreateDoctorSlotsDto, SetWorkingHoursDto } from "./doctor-workspace.dto";
 
@@ -18,6 +19,7 @@ export class DoctorWorkspaceService {
     private readonly db: DbService,
     private readonly users: UsersService,
     private readonly audit: AuditService,
+    private readonly fiscalReceipts: FiscalReceiptsService,
   ) {}
 
   private async requireDoctor(principal: Principal) {
@@ -480,6 +482,17 @@ export class DoctorWorkspaceService {
         `insert into outbox_events(aggregate_type,aggregate_id,event_type,payload) values ('appointment',$1,'appointment.completed',$2::jsonb)`,
         [appointmentId, JSON.stringify({ appointmentId })],
       );
+      // The service is now rendered, so the prepaid amount must be closed with a
+      // final 54-ФЗ receipt. Queueing happens in the same transaction as the
+      // completion itself, which keeps the fiscal duty from being lost.
+      const queuedReceipts = await this.fiscalReceipts.enqueueFinalReceipt(client, appointmentId);
+      if (queuedReceipts > 0) {
+        await client.query(
+          `insert into audit_events(actor_user_id,actor_subject,action,resource_type,resource_id,metadata)
+           values ($1,$2,'payment.fiscal_receipt.queue','appointment',$3,$4::jsonb)`,
+          [user.id, principal.sub, appointmentId, JSON.stringify({ queued: queuedReceipts })],
+        );
+      }
       return { id: appointmentId, status: "completed" };
     });
   }

@@ -45,22 +45,34 @@ The current source also contains:
 - patient pre-payment view of organization, license, service, doctor, price, refund terms and service procedure
 - server-side payment gate requiring a matching accepted commercial contract
 - admin paid-service configuration screen and doctor slot-to-offer linking
+- Robokassa payment adapter (MIT `@robokassa/sdk`) with invoice references, signed callback verification and refunds
+- provider-neutral fiscalization boundary with a Robokassa KKT adapter for the 54-ФЗ final receipt
+- durable fiscal receipt queue with a lease-based worker, confirmed FN/document/attribute storage
+- raw provider callback log (`payment_webhooks`) with signature outcome, separate from `payment_events`
+- patient receipt state on the checkout card and a KKT section on the admin payments screen
 
-Database migrations currently run from `001_initial.sql` through `025_paid_medical_services.sql`.
+Database migrations currently run from `001_initial.sql` through `028_payment_fiscal_lifecycle.sql`.
 
-## Validation on 2026-10-13
+## Validation on 2026-11-03
 
-- root TypeScript typecheck: PASS after Stage 13 changes
-- API TypeScript typecheck: PASS after Stage 13 changes
-- Web TypeScript typecheck: PASS after Stage 13 changes
-- production build: PASS after Stage 13 changes (API + Web, 25 Next.js routes)
-- `/admin/services` generated in the production build
-- infrastructure static validation: PASS after Stage 13 changes
-- `git diff --check`: PASS before final Stage 13 commit
+- API TypeScript typecheck: PASS after Stage 14 changes
+- Web TypeScript typecheck: PASS after Stage 14 changes
+- production build: PASS after Stage 14 changes
+- infrastructure static validation: PASS after Stage 14 changes
+- `git diff --check`: PASS
 
 ## Runtime status for this change
 
-Docker CLI is not installed on the HP workstation used for this change. Therefore migration `025`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
+Docker CLI and PostgreSQL are not installed on the HP workstation used for this change. Therefore migration `028`, PostgreSQL execution and full Docker/E2E runtime are not claimed as locally verified here. Source/type/build validation is separate from database/runtime validation and the latter must run in a Docker/PostgreSQL-capable environment before production use.
+
+## Fiscalization boundary status
+
+Stage 14 implements the 54-ФЗ final receipt as a provider boundary, not as a hand-rolled protocol:
+`@robokassa/sdk` signs and transports `Receipt/Attach` and `Receipt/Status`, MedicalPlatform only
+builds the documented payload and stores confirmed fiscal attributes. The development adapter
+records `not_provided` and never pretends a receipt was issued. No live merchant credentials, KKT
+contract or test contour were available, so no fiscal registration has been executed end-to-end;
+correction and refund receipts remain unimplemented.
 
 ## EGISZ / REMD boundary status
 
@@ -72,7 +84,9 @@ No fake EGISZ/REMD network success path is implemented. A real provider adapter 
 
 ## Next roadmap item
 
-After Stage 13 validation, the next unfinished roadmap item is Stage 14: production payment and fiscalization/KKT architecture. Extend the existing `payments`, `payment_events` and `refunds` flow instead of creating a parallel payment system; add receipt/fiscal records and a real provider boundary only with explicit configuration and credentials.
+After Stage 14 source validation, the next unfinished roadmap item is Stage 15:
+telemedicine session. Bind the existing LiveKit provider to the
+`appointment → encounter` chain instead of creating a parallel video subsystem.
 
 ## Not production-complete
 

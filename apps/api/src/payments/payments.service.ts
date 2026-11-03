@@ -4,7 +4,7 @@ import type { Principal } from "../auth/principal";
 import { AuditService } from "../audit/audit.service";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
-import { PAYMENT_PROVIDER, type PaymentProvider } from "./payment.provider";
+import { PAYMENT_PROVIDER, type PaymentProvider, type VerifiedPaymentEvent } from "./payment.provider";
 
 type AppointmentPaymentFacts = {
   appointment_id: string;
@@ -148,47 +148,136 @@ export class PaymentsService {
     return rows.map((row) => this.mapPayment(row));
   }
 
+  /**
+   * Keeps the raw callback hash and its verification outcome. The normalised
+   * `payment_events` stream stays the idempotency boundary; this table answers
+   * "was this callback really received and was its signature valid" for
+   * reconciliation and dispute review.
+   */
+  private async recordWebhook(input: {
+    payloadSha256: string;
+    signaturePresent: boolean;
+    signatureValid: boolean;
+    externalEventId?: string | null;
+    status: "received" | "processed" | "duplicate" | "rejected" | "failed";
+    errorCode?: string | null;
+  }) {
+    await this.db.query(
+      `insert into payment_webhooks(provider,payload_sha256,signature_present,signature_valid,
+                                    external_event_id,processing_status,error_code,processed_at)
+       values ($1,$2,$3,$4,$5,$6,$7,
+               case when $6 in ('processed','duplicate','rejected') then now() else null end)
+       on conflict (provider,payload_sha256) do update
+       set processing_status=case
+             when payment_webhooks.processing_status in ('processed','duplicate')
+              and excluded.processing_status='received'
+             then payment_webhooks.processing_status
+             else excluded.processing_status
+           end,
+           error_code=excluded.error_code,
+           signature_valid=excluded.signature_valid,
+           external_event_id=coalesce(excluded.external_event_id,payment_webhooks.external_event_id),
+           processed_at=excluded.processed_at`,
+      [
+        this.provider.name,
+        input.payloadSha256,
+        input.signaturePresent,
+        input.signatureValid,
+        input.externalEventId ?? null,
+        input.status,
+        input.errorCode ?? null,
+      ],
+    );
+  }
+
   async processWebhook(signature: string | undefined, body: unknown) {
-    const event = await this.provider.verifyWebhook(signature, body);
     const payloadSha256 = createHash("sha256").update(JSON.stringify(body ?? {})).digest("hex");
+    // A verified callback carried a credential even when it lives in the body
+    // (Robokassa `SignatureValue`) instead of a transport header, so this column
+    // means "verification credential present", not "HTTP header present".
+    let signaturePresent = Boolean(signature);
 
-    const result = await this.db.tx(async (client) => {
-      const paymentResult = await client.query<PaymentRow>(
-        `select * from payments where provider=$1 and provider_payment_id=$2 for update`,
-        [this.provider.name, event.providerPaymentId],
-      );
-      const payment = paymentResult.rows[0];
-      if (!payment) throw new NotFoundException("Payment not found");
+    let event: VerifiedPaymentEvent;
+    try {
+      event = await this.provider.verifyWebhook(signature, body);
+      signaturePresent = true;
+    } catch (error) {
+      await this.recordWebhook({
+        payloadSha256,
+        signaturePresent,
+        signatureValid: false,
+        status: "rejected",
+        errorCode: "webhook_verification_failed",
+      }).catch(() => undefined);
+      throw error;
+    }
 
-      const inserted = await client.query<{ id: string }>(
-        `insert into payment_events(payment_id,provider,provider_event_id,event_type,payload_sha256)
-         values ($1,$2,$3,$4,$5)
-         on conflict (provider,provider_event_id) do nothing
-         returning id`,
-        [payment.id, this.provider.name, event.providerEventId, event.eventType, payloadSha256],
-      );
-      if (!inserted.rows[0]) return { duplicate: true, paymentId: payment.id };
+    await this.recordWebhook({
+      payloadSha256,
+      signaturePresent,
+      signatureValid: true,
+      externalEventId: event.providerEventId,
+      status: "received",
+    }).catch(() => undefined);
 
-      await client.query(
-        `update payments
-         set status=$2,
-             paid_at=case when $2='paid' then coalesce(paid_at,now()) else paid_at end,
-             failed_at=case when $2='failed' then now() else failed_at end,
-             updated_at=now()
-         where id=$1`,
-        [payment.id, event.status],
-      );
-      await client.query(
-        `update payment_events set processing_status='processed',processed_at=now() where id=$1`,
-        [inserted.rows[0].id],
-      );
-      await client.query(
-        `insert into outbox_events(aggregate_type,aggregate_id,event_type,payload)
-         values ('payment',$1,'payment.status_changed',$2::jsonb)`,
-        [payment.id, JSON.stringify({ paymentId: payment.id, appointmentId: payment.appointment_id, status: event.status })],
-      );
-      return { duplicate: false, paymentId: payment.id, status: event.status };
-    });
+    let result: { duplicate: boolean; paymentId: string; status?: string };
+    try {
+      result = await this.db.tx(async (client) => {
+        const paymentResult = await client.query<PaymentRow>(
+          `select * from payments where provider=$1 and provider_payment_id=$2 for update`,
+          [this.provider.name, event.providerPaymentId],
+        );
+        const payment = paymentResult.rows[0];
+        if (!payment) throw new NotFoundException("Payment not found");
+
+        const inserted = await client.query<{ id: string }>(
+          `insert into payment_events(payment_id,provider,provider_event_id,event_type,payload_sha256)
+           values ($1,$2,$3,$4,$5)
+           on conflict (provider,provider_event_id) do nothing
+           returning id`,
+          [payment.id, this.provider.name, event.providerEventId, event.eventType, payloadSha256],
+        );
+        if (!inserted.rows[0]) return { duplicate: true, paymentId: payment.id, status: payment.status };
+
+        await client.query(
+          `update payments
+           set status=$2,
+               paid_at=case when $2='paid' then coalesce(paid_at,now()) else paid_at end,
+               failed_at=case when $2='failed' then now() else failed_at end,
+               updated_at=now()
+           where id=$1`,
+          [payment.id, event.status],
+        );
+        await client.query(
+          `update payment_events set processing_status='processed',processed_at=now() where id=$1`,
+          [inserted.rows[0].id],
+        );
+        await client.query(
+          `insert into outbox_events(aggregate_type,aggregate_id,event_type,payload)
+           values ('payment',$1,'payment.status_changed',$2::jsonb)`,
+          [payment.id, JSON.stringify({ paymentId: payment.id, appointmentId: payment.appointment_id, status: event.status })],
+        );
+        return { duplicate: false, paymentId: payment.id, status: event.status };
+      });
+    } catch (error) {
+      await this.recordWebhook({
+        payloadSha256,
+        signaturePresent,
+        signatureValid: true,
+        externalEventId: event.providerEventId,
+        status: "failed",
+        errorCode: "webhook_processing_failed",
+      }).catch(() => undefined);
+      throw error;
+    }
+
+    await this.recordWebhook({
+      payloadSha256,
+      signaturePresent,
+      signatureValid: true,
+      externalEventId: event.providerEventId,
+      status: result.duplicate ? "duplicate" : "processed",
+    }).catch(() => undefined);
 
     if (!result.duplicate) {
       await this.audit.record({

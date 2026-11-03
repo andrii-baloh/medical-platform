@@ -22,7 +22,9 @@ Roadmap work after recovery adds a separate medical encounter, patient medical-r
 
 Stage 13 adds organization-owned service catalogs and offers, immutable versioned contract text, patient contract acceptance evidence and immutable commercial snapshots. Doctor slots may be linked to a configured service offer; the patient sees the organization, license, service, doctor, exact price, conditions, refund rules and service procedure before accepting the contract. The existing payment API refuses to create a payment session until the appointment has a matching accepted contract, so the frontend cannot bypass the legal pre-payment gate.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `025_paid_medical_services.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Stage 14 adds the production payment and fiscal contour: a Robokassa adapter built on the MIT `@robokassa/sdk`, raw callback storage with signature outcome, and a provider-neutral KKT boundary that registers the 54-ФЗ final receipt after the consultation is completed. Fiscal attributes are stored only when the KKT operator confirms them; the development adapter records `not_provided` and never fakes a receipt. See `docs/STAGE14_FISCALIZATION.md`.
+
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `028_payment_fiscal_lifecycle.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 

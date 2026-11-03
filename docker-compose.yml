@@ -35,6 +35,13 @@ services:
       - ./db/migrations/019_medical_organization.sql:/docker-entrypoint-initdb.d/019_medical_organization.sql:ro
       - ./db/migrations/020_doctor_regulatory_profile.sql:/docker-entrypoint-initdb.d/020_doctor_regulatory_profile.sql:ro
       - ./db/migrations/021_legal_representative.sql:/docker-entrypoint-initdb.d/021_legal_representative.sql:ro
+      - ./db/migrations/022_esia_identity.sql:/docker-entrypoint-initdb.d/022_esia_identity.sql:ro
+      - ./db/migrations/023_egisz_integration.sql:/docker-entrypoint-initdb.d/023_egisz_integration.sql:ro
+      - ./db/migrations/024_remd_registration_workflow.sql:/docker-entrypoint-initdb.d/024_remd_registration_workflow.sql:ro
+      - ./db/migrations/025_paid_medical_services.sql:/docker-entrypoint-initdb.d/025_paid_medical_services.sql:ro
+      - ./db/migrations/026_payment_provider_references.sql:/docker-entrypoint-initdb.d/026_payment_provider_references.sql:ro
+      - ./db/migrations/027_payment_fiscalization.sql:/docker-entrypoint-initdb.d/027_payment_fiscalization.sql:ro
+      - ./db/migrations/028_payment_fiscal_lifecycle.sql:/docker-entrypoint-initdb.d/028_payment_fiscal_lifecycle.sql:ro
       - ./db/dev/999_dev_doctor_seed.sql:/docker-entrypoint-initdb.d/999_dev_doctor_seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-medicare} -d ${POSTGRES_DB:-medicare}"]
