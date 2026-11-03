@@ -33,6 +33,7 @@ import { CommercialServicesModule } from "./commercial-services/commercial-servi
 import { TelemedicineModule } from "./telemedicine/telemedicine.module";
 import { ConsultationMaterialsModule } from "./consultation-materials/consultation-materials.module";
 import { RetentionModule } from "./retention/retention.module";
+import { SecurityIncidentsModule } from "./incidents/security-incidents.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -70,6 +71,7 @@ import { validateEnv } from "./config/env";
     TelemedicineModule,
     ConsultationMaterialsModule,
     RetentionModule,
+    SecurityIncidentsModule,
   ],
   controllers: [HealthController],
 })

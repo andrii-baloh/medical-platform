@@ -36,6 +36,8 @@ Stage 19 adds the security baseline: API security headers, a production configur
 
 Stage 20 documents the Russian deployment cell: reference topology, component requirement matrix and acceptance criteria for database, object storage, backups, logs, LiveKit and integrations. No provider is selected and nothing is provisioned — see `docs/DATA_RESIDENCY.md`.
 
+Stage 21 adds the security incident workflow: `security_incidents` plus an append-only timeline for detection, containment, regulator notification and final report, available through admin-only endpoints and fully audited. See `docs/INCIDENT_RESPONSE.md`.
+
 Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary

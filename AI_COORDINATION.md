@@ -175,3 +175,15 @@ Stage 20 is an architecture deliverable, not a provisioned environment. `docs/DA
 Nothing was provisioned and no provider was selected; the STRATO VPS was not used. Existing code already supports the topology without changes: `S3_ENDPOINT` and `LIVEKIT_URL` are configuration, payment/fiscal adapters are Russian, and production requires `DEPLOYMENT_COUNTRY` with development placeholders rejected.
 
 Next roadmap item is Stage 21 incident response: `SecurityIncident` with timeline, containment actions, reporting deadline and regulator notification, built on the existing admin/audit patterns.
+
+## Stage 21 handoff — security incident response — 2026-11-03
+
+Stage 21 adds migration `032_security_incidents.sql` with `security_incidents` (detection time, type, severity, status, affected systems/data classes/user count, investigator, containment, reporting deadline, regulator reference, final report) and `security_incident_events` as an append-only timeline.
+
+The admin API (`/v1/admin/security-incidents`) registers incidents, lists and reads them with the timeline, patches scope/containment/regulator fields, changes status and adds notes. Containment, notification and final-report updates append the matching timeline event automatically, and every action is written to `audit_events`. The record holds technical facts only — no clinical content is required or copied.
+
+Deliberate gaps: no admin UI, no deadline reminders/escalation, no regulator integration (notification is recorded, not transmitted), no evidence attachments.
+
+Not verified: migration `032` execution and runtime behaviour (no PostgreSQL here).
+
+Next roadmap item is Stage 22 remote patient monitoring: `MonitoringProgram`, `PatientMonitoringEnrollment`, `MedicalDevice`, `Measurement`, `MeasurementThreshold`, `ClinicalAlert`, `MonitoringReview`, built on the existing engagement module and encounter model.
