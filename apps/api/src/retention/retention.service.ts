@@ -29,8 +29,11 @@ type RetentionPolicyRow = {
 /** A class becomes automatically deletable only when a real executor exists. */
 type Executor = {
   objectType: string;
+  /** The operation this executor really performs; the policy cannot change it. */
+  action: "delete" | "soft_delete";
   countSql: string;
   eligibleSql: string;
+  /** Must return the ids that were actually changed. */
   mutateSql: string;
 };
 
@@ -42,17 +45,19 @@ type Executor = {
 const EXECUTORS: Partial<Record<RetentionDataClass, Executor>> = {
   consultation_materials: {
     objectType: "consultation_material",
+    action: "delete",
     countSql: `select count(*)::int total from consultation_materials where created_at < $1`,
     eligibleSql: `select id from consultation_materials where created_at < $1 order by created_at limit $2`,
-    mutateSql: `delete from consultation_materials where id = any($1::uuid[])`,
+    mutateSql: `delete from consultation_materials where id = any($1::uuid[]) returning id`,
   },
   medical_documents: {
     objectType: "medical_document",
+    action: "soft_delete",
     countSql: `select count(*)::int total from medical_documents where created_at < $1 and status <> 'deleted'`,
     eligibleSql: `select id from medical_documents where created_at < $1 and status <> 'deleted' order by created_at limit $2`,
     // Soft delete only: the storage object and the immutable version history
     // stay intact until a storage-aware purge procedure is approved.
-    mutateSql: `update medical_documents set status='deleted',updated_at=now() where id = any($1::uuid[]) and status <> 'deleted'`,
+    mutateSql: `update medical_documents set status='deleted',updated_at=now() where id = any($1::uuid[]) and status <> 'deleted' returning id`,
   },
 };
 
@@ -128,9 +133,17 @@ export class RetentionService {
       throw new BadRequestException("An active retention policy requires retentionDays and a legal basis of at least 10 characters");
     }
 
+    // The executed operation is a property of the class, not of the request:
+    // otherwise the journal could claim a soft delete while rows were removed.
+    const executor = EXECUTORS[dataClass];
+    if (executor && input.action && input.action !== executor.action) {
+      throw new BadRequestException(`Data class ${dataClass} supports only ${executor.action}`);
+    }
+    const action = executor?.action ?? input.action ?? "delete";
+
     const { rows } = await this.db.query<RetentionPolicyRow>(
       `insert into retention_policies(data_class,retention_days,action,legal_basis,active,updated_by_user_id)
-       values ($1,$2,coalesce($3,'delete'),$4,$5,$6)
+       values ($1,$2,$3,$4,$5,$6)
        on conflict (data_class) do update
        set retention_days=excluded.retention_days,
            action=excluded.action,
@@ -139,7 +152,7 @@ export class RetentionService {
            updated_by_user_id=excluded.updated_by_user_id,
            updated_at=now()
        returning id,data_class,retention_days,action,legal_basis,active,updated_at`,
-      [dataClass, input.retentionDays ?? null, input.action, legalBasis ?? null, input.active, user.id],
+      [dataClass, input.retentionDays ?? null, action, legalBasis ?? null, input.active, user.id],
     );
 
     await this.audit.record({
@@ -236,27 +249,41 @@ export class RetentionService {
       for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
         const processed = await this.db.tx(async (client) => {
           const { rows } = await client.query<{ id: string }>(executor.eligibleSql, [cutoff, BATCH_SIZE]);
-          if (!rows.length) return 0;
+          if (!rows.length) return { selected: 0, changed: 0 };
           const ids = rows.map((row) => row.id);
-          const mutated = await client.query(executor.mutateSql, [ids]);
-          await client.query(
-            `insert into retention_deletion_log(run_id,policy_id,data_class,object_type,object_id,action,details)
-             select $1,$2,$3,$4,id,$5,$6::jsonb from unnest($7::uuid[]) as id`,
-            [
-              runId,
-              policy.id,
-              dataClass,
-              executor.objectType,
-              policy.action,
-              JSON.stringify({ cutoffAt: cutoff.toISOString(), retentionDays: policy.retention_days }),
-              ids,
-            ],
-          );
-          return mutated.rowCount ?? 0;
+          // The journal must list exactly the rows this run changed, not the
+          // rows it merely considered: the mutation returns affected ids.
+          const mutated = await client.query<{ id: string }>(executor.mutateSql, [ids]);
+          const changed = mutated.rows.map((row) => row.id);
+          if (changed.length) {
+            await client.query(
+              `insert into retention_deletion_log(run_id,policy_id,data_class,object_type,object_id,action,details)
+               select $1,$2,$3,$4,id,$5,$6::jsonb from unnest($7::uuid[]) as id`,
+              [
+                runId,
+                policy.id,
+                dataClass,
+                executor.objectType,
+                executor.action,
+                // Snapshot of the effective policy: the policy row may be
+                // edited later, the journal must still explain this deletion.
+                JSON.stringify({
+                  cutoffAt: cutoff.toISOString(),
+                  retentionDays: policy.retention_days,
+                  policyUpdatedAt: new Date(policy.updated_at).toISOString(),
+                  legalBasis: policy.legal_basis,
+                }),
+                changed,
+              ],
+            );
+          }
+          return { selected: ids.length, changed: changed.length };
         });
-        scanned += processed;
-        affected += processed;
-        if (processed < BATCH_SIZE) break;
+        scanned += processed.selected;
+        affected += processed.changed;
+        // Stop only when the page was not full; a page where nothing could be
+        // changed (concurrent update) must not end the run early.
+        if (processed.selected < BATCH_SIZE) break;
       }
 
       await this.db.query(

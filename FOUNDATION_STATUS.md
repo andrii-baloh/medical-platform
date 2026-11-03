@@ -123,6 +123,7 @@ role change, representative access) while keeping clinical free text out of audi
 - production observability/alerting and security scanning
 - telemedicine session recording/egress (state only today)
 - configured retention policies with a customer-approved legal basis, storage-aware document purge and legal hold
+- legal hold / litigation hold for retention (mandatory production blocker: a retention job must never delete held data)
 - retention/deletion policy implementation
 - final Russian legal/compliance validation for the selected deployment and medical organization
 

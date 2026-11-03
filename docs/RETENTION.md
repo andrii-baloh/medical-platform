@@ -56,12 +56,39 @@ classes that already have an active policy with a legal basis and an executor. E
 bounded by `RETENTION_BATCH_SIZE` × `RETENTION_MAX_BATCHES`, so a large backlog is processed
 across several runs instead of one unbounded transaction.
 
+## Safety invariants
+
+- The journal stores the effective policy snapshot for every deletion (`cutoffAt`, `retentionDays`,
+  `policyUpdatedAt`, `legalBasis`) plus the immutable `retention_runs` row (`policy_id`,
+  `cutoff_at`), so a later policy edit cannot change the history of what was deleted.
+- `retention_deletion_log.object_id` lists only rows the mutation **actually** changed
+  (`RETURNING id`), not rows merely selected.
+- The executed operation is a property of the data class: `consultation_materials` is hard delete,
+  `medical_documents` is soft delete, and the API rejects a policy that claims otherwise. The
+  journal therefore cannot report a soft delete for removed rows.
+- Deleting a consultation material removes only that row: `document_id`, `encounter_id`,
+  `appointment_id` are `ON DELETE RESTRICT` children, document versions live in
+  `medical_document_versions`, and `audit_events.resource_id` is a plain `text` reference with no
+  cascade — no document, version, encounter or audit row is touched.
+- One running execution per data class is enforced by a partial unique index, so two workers or an
+  admin plus a worker cannot process the same class concurrently.
+
+## Production blockers (must be closed before real data)
+
+1. **Legal hold.** There is no litigation/regulatory hold concept yet: a hold must be able to freeze
+   a policy and every object it covers before any destructive run happens. This is mandatory — a
+   retention job must never delete data that is under hold.
+2. Storage-aware document purge: today document retention is a soft delete only; MinIO objects and
+   version history remain.
+3. Abandoned runs: a crash leaves `retention_runs.status='running'`, which blocks that class until
+   an operator marks the run failed. A lease/recovery mechanism is required before unattended use.
+4. Customer-approved retention periods and legal bases per data class; the platform seeds none.
+
 ## Deliberate gaps
 
 - No admin UI yet: configuration is available through the admin API; the UI is a follow-up.
-- No storage-object purge: document retention is a soft delete until the MinIO deletion
-  procedure (including version history and REMD references) is approved.
-- No legal-hold / litigation-hold concept yet; a hold would have to freeze a policy.
+- No storage-object purge: document retention is a soft delete until the MinIO deletion procedure
+  (including version history and REMD references) is approved.
 - No export/anonymization of clinical text.
 
 ## Verification
