@@ -59,6 +59,8 @@ The current source also contains:
 - retention policy registry with explicit period and legal basis, journaled runs and a deletion log
 - preview (dry-run) and a retention worker that is disabled by default
 - automatic retention only for consultation materials and medical-document soft delete; auditing, payment and consent classes refuse execution
+- audit event catalogue with one source of truth for action names
+- consultation opening and trusted role changes are audited with actor, resource and outcome
 
 Database migrations currently run from `001_initial.sql` through `031_retention_policies.sql`.
 
@@ -72,6 +74,7 @@ Database migrations currently run from `001_initial.sql` through `031_retention_
 - Stage 15: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 16: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 17: API typecheck PASS, production build PASS, infrastructure validation PASS
+- Stage 18: API typecheck PASS, production build PASS, infrastructure validation PASS
 
 ## Runtime status for this change
 
@@ -107,10 +110,10 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 17, the next unfinished roadmap item is Stage 18: audit expansion. Extend the existing
-`audit_events` stream with the event catalogue from the brief (patient record opened, document
-viewed/downloaded/modified, signature created, consent signed, payment operation, admin action,
-role change, representative access) while keeping clinical free text out of audit metadata.
+After Stage 18, the next unfinished roadmap item is Stage 19: security / 152-ФЗ. It requires the
+Docker/PostgreSQL runtime contour to exist, because MFA enforcement, secrets management,
+encryption, backup/restore tests, log protection, security headers, upload validation, rate
+limiting, brute-force protection and the threat model cannot be verified from source alone.
 
 ## Not production-complete
 
@@ -121,6 +124,7 @@ role change, representative access) while keeping clinical free text out of audi
 - KMS/envelope encryption where required
 - tested production backup/restore and disaster recovery
 - production observability/alerting and security scanning
+- ingestion of IdP authentication events (login, logout, failed login) into the platform audit trail
 - telemedicine session recording/egress (state only today)
 - configured retention policies with a customer-approved legal basis, storage-aware document purge and legal hold
 - legal hold / litigation hold for retention (mandatory production blocker: a retention job must never delete held data)

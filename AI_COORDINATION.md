@@ -145,3 +145,13 @@ Only classes with a real executor can be processed: consultation materials are d
 Not verified: migration `031` execution on PostgreSQL and any destructive run against real data. Typecheck, build, infrastructure validation and API boot passed.
 
 Next roadmap item is Stage 18 audit expansion: extend the existing `audit_events` stream with the event catalogue from the brief (record opened, document viewed/downloaded/modified, signature created, consent signed, payment operation, role change, representative access) without copying clinical text.
+
+## Stage 18 handoff — audit — 2026-11-03
+
+Stage 18 does not create a second audit subsystem: `audit_events` already carries actor, resource, outcome, request id and metadata, and most modules already emit events. This stage adds `apps/api/src/audit/audit-events.ts` as the single place that names events and documents the rules (no clinical free text, no tokens, denied actions recorded as `denied`), then closes two real gaps: `consultation.opened` when a patient opens their consultation, and `user.role.changed` written in the same transaction as the trusted role rows whenever the role set actually changes.
+
+`docs/AUDIT.md` contains the full coverage matrix against the brief. Remaining gaps are explicit: authentication events (login, logout, failed login) belong to Keycloak/ESIA and have no ingestion path yet; representative access has no clinical path to audit; document version creation by the scanner is not a separate event; audit retention remains refused by the retention engine until a legal procedure exists.
+
+Not verified: runtime behaviour against PostgreSQL. Typecheck, build, infrastructure validation and API boot passed.
+
+Next roadmap item is Stage 19 security/152-ФЗ: RBAC review, MFA enforcement, secrets management, encryption, backups/restore, log protection, headers, upload validation, rate limiting and the threat model — after the runtime contour is available in Docker.

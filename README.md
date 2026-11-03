@@ -30,6 +30,8 @@ Stage 16 adds consultation chat and materials bound to the medical encounter: te
 
 Stage 17 adds the retention policy registry: policy rows per data class with an explicit period and legal basis, journaled runs, a deletion log, dry-run preview and a worker that is disabled by default. The platform invents no retention periods and only executes classes that have a real, approved disposal procedure. See `docs/RETENTION.md`.
 
+Stage 18 consolidates the audit event catalogue and closes the missing access events: a patient opening a consultation and a trusted role change are now recorded with actor, resource and outcome, while authentication events remain delegated to the identity provider. See `docs/AUDIT.md`.
+
 Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary

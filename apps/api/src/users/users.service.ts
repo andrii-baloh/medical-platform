@@ -1,5 +1,6 @@
-﻿import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { DbService } from "../db/db.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import type { Principal } from "../auth/principal";
 
 @Injectable()
@@ -23,8 +24,22 @@ export class UsersService {
       const trustedRoles = new Set(["patient", "doctor", "admin"]);
       const roles = new Set<string>(["patient"]);
       for (const role of principal.roles ?? []) if (trustedRoles.has(role)) roles.add(role);
+      const previous = await client.query<{ role: string }>(`select role from user_roles where user_id=$1`, [user.id]);
+      const previousRoles = new Set(previous.rows.map((row) => row.role));
       await client.query(`delete from user_roles where user_id=$1 and role in ('doctor','admin')`, [user.id]);
       for (const role of roles) await client.query(`insert into user_roles(user_id,role) values ($1,$2) on conflict do nothing`, [user.id, role]);
+
+      // A trusted role change is a privileged event: record it even though the
+      // change is derived from the identity token rather than an admin action.
+      const added = [...roles].filter((role) => !previousRoles.has(role));
+      const removed = [...previousRoles].filter((role) => !roles.has(role));
+      if (added.length || removed.length) {
+        await client.query(
+          `insert into audit_events(actor_user_id,actor_subject,action,resource_type,resource_id,metadata)
+           values ($1,$2,$3,'app_user',$4,$5::jsonb)`,
+          [user.id, principal.sub, AUDIT_EVENT.USER_ROLE_CHANGED, user.id, JSON.stringify({ added, removed })],
+        );
+      }
 
       const existing = await client.query(`select id from patient_profiles where owner_user_id=$1 and relation_to_owner='self' and archived_at is null limit 1`, [user.id]);
       if (!existing.rowCount) {

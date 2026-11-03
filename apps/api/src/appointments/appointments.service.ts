@@ -1,12 +1,18 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { DbService } from "../db/db.service";
 import { UsersService } from "../users/users.service";
+import { AuditService } from "../audit/audit.service";
+import { AUDIT_EVENT } from "../audit/audit-events";
 import type { Principal } from "../auth/principal";
 import type { BookAppointmentDto } from "./appointment.dto";
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly db: DbService, private readonly users: UsersService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly users: UsersService,
+    private readonly audit: AuditService,
+  ) {}
 
   async list(principal: Principal) {
     const user = await this.users.ensureAccount(principal);
@@ -58,6 +64,16 @@ export class AppointmentsService {
     );
     const r = rows[0];
     if (!r) throw new NotFoundException("Appointment not found");
+    // Opening a consultation is a sensitive read and must be auditable; the
+    // metadata stays technical (status only, never the reason or clinical text).
+    await this.audit.record({
+      actorUserId: user.id,
+      actorSubject: principal.sub,
+      action: AUDIT_EVENT.CONSULTATION_OPENED,
+      resourceType: "appointment",
+      resourceId: appointmentId,
+      metadata: { status: r.status, role: "patient" },
+    });
     return {
       id: r.id,
       status: r.status,
