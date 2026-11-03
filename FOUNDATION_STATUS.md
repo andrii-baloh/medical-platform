@@ -61,6 +61,9 @@ The current source also contains:
 - automatic retention only for consultation materials and medical-document soft delete; auditing, payment and consent classes refuse execution
 - audit event catalogue with one source of truth for action names
 - consultation opening and trusted role changes are audited with actor, resource and outcome
+- denied access attempts audited at document, consultation, telemedicine and admin boundaries
+- API baseline security headers and a production configuration guard
+- isolated local test contour definition with backup/restore and dependency-audit scripts
 
 Database migrations currently run from `001_initial.sql` through `031_retention_policies.sql`.
 
@@ -75,6 +78,7 @@ Database migrations currently run from `001_initial.sql` through `031_retention_
 - Stage 16: API and Web typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 17: API typecheck PASS, production build PASS, infrastructure validation PASS
 - Stage 18: API typecheck PASS, production build PASS, infrastructure validation PASS
+- Stage 19: API typecheck PASS, production build PASS, infrastructure validation PASS; no runtime security test executed (Docker absent)
 
 ## Runtime status for this change
 
@@ -110,12 +114,16 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-After Stage 18, the next unfinished roadmap item is Stage 19: security / 152-ФЗ. It requires the
-Docker/PostgreSQL runtime contour to exist, because MFA enforcement, secrets management,
-encryption, backup/restore tests, log protection, security headers, upload validation, rate
-limiting, brute-force protection and the threat model cannot be verified from source alone.
+After Stage 19, the next unfinished roadmap item is Stage 20: data localization. The production
+deployment must keep personal data in Russian infrastructure (database, object storage, backups,
+logs, LiveKit), with the provider chosen together with the customer.
 
 ## Not production-complete
+
+**Stage 19 is not a production-ready claim.** The mandatory security blockers are listed in
+`docs/SECURITY.md` (MFA end-to-end, RBAC on a live database, encryption, secret manager, verified
+restore, session revocation, protected log sink, CI vulnerability gates) and in `docs/RETENTION.md`
+(legal hold, abandoned retention-run recovery).
 
 - live EGISZ/REMD provider integration and conformance testing
 - production clinician identity proofing and qualified electronic-signature provider

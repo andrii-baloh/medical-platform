@@ -84,10 +84,43 @@ const schema = z.object({
   CORS_ORIGINS: z.string().min(1).default("http://localhost:3000"),
 });
 
+/**
+ * Production refuses development placeholders instead of silently serving real
+ * patients with local secrets. This is a configuration guard, not a substitute
+ * for a secret manager.
+ */
+const DEVELOPMENT_PLACEHOLDER = /local-dev|change-me|changeme|example\.com/i;
+const PLACEHOLDER_SENSITIVE_KEYS = [
+  "DATABASE_URL",
+  "OIDC_ISSUER_URL",
+  "OIDC_JWKS_URL",
+  "PAYMENT_DEV_WEBHOOK_SECRET",
+  "S3_SECRET_KEY",
+  "SMTP_URL",
+] as const;
+
 export function validateEnv(input: Record<string, unknown>) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
     throw new Error(`Invalid API environment: ${parsed.error.message}`);
   }
-  return { ...input, ...parsed.data };
+  const merged = { ...input, ...parsed.data } as Record<string, unknown>;
+
+  if ((process.env.NODE_ENV ?? "").toLowerCase() === "production") {
+    const offenders = PLACEHOLDER_SENSITIVE_KEYS.filter((key) => {
+      const value = merged[key];
+      return typeof value === "string" && DEVELOPMENT_PLACEHOLDER.test(value);
+    });
+    if (offenders.length) {
+      throw new Error(`Unsafe production configuration: ${offenders.join(", ")} still contain development placeholders`);
+    }
+    if (merged.RATE_LIMIT_ENABLED === "false") {
+      throw new Error("RATE_LIMIT_ENABLED must not be disabled in production");
+    }
+    if (merged.DEPLOYMENT_COUNTRY === "XX") {
+      throw new Error("DEPLOYMENT_COUNTRY must be set to the real deployment country in production");
+    }
+  }
+
+  return merged;
 }

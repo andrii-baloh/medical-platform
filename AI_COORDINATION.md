@@ -155,3 +155,15 @@ Stage 18 does not create a second audit subsystem: `audit_events` already carrie
 Not verified: runtime behaviour against PostgreSQL. Typecheck, build, infrastructure validation and API boot passed.
 
 Next roadmap item is Stage 19 security/152-ФЗ: RBAC review, MFA enforcement, secrets management, encryption, backups/restore, log protection, headers, upload validation, rate limiting and the threat model — after the runtime contour is available in Docker.
+
+## Stage 19 handoff — security baseline — 2026-11-03
+
+Stage 19 is an inventory, gap analysis and a conservative baseline, not a production claim. `docs/SECURITY.md` lists every existing control with its location and how it was verified, the threat model, the data classification and ten production blockers.
+
+Implemented: baseline security headers on every API response (nosniff, frame deny, no-referrer, COOP/CORP, no-store); a production-only configuration guard that refuses development placeholders in DATABASE_URL/OIDC/PAYMENT/S3/SMTP, disabled rate limiting and an unset DEPLOYMENT_COUNTRY; denied-access audit events at four authorization boundaries; an isolated Docker test contour (`medicare-test` project, `.env.test.example`, `scripts/test-up.ps1`/`test-down.ps1`); backup and restore scripts with explicit destructive confirmation; `scripts/security-audit.ps1` for dependency and infrastructure checks.
+
+Not implemented and deliberately blocked: MFA end-to-end verification, RBAC matrix against a live database, encryption at rest/in transit, secret manager integration, verified restore, centralized protected logging, CI vulnerability gates, session revocation. No Docker or PostgreSQL is available on this workstation, so none of the scripts or controls has been executed; the STRATO VPS was not used.
+
+Legal hold (Stage 17) and abandoned retention-run recovery remain mandatory blockers, listed in `docs/RETENTION.md` and `docs/SECURITY.md`.
+
+Next roadmap item is Stage 20 data localization: deployment architecture for Russian infrastructure (database, object storage, backups, logs, LiveKit) with a provider chosen by the customer.

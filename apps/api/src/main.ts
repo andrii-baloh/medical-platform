@@ -18,6 +18,20 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Baseline security headers for every API response. The API returns JSON and
+  // presigned URLs only, so a deny-by-default frame/referrer policy is safe and
+  // no response may be cached by shared proxies.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = normalizeRequestId(req.header("x-request-id")) ?? randomUUID();
     const startedAt = process.hrtime.bigint();
