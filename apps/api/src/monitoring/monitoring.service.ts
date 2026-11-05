@@ -45,7 +45,13 @@ export class MonitoringService {
     if (!principal.roles.includes("doctor")) throw new ForbiddenException("Doctor role is required");
     const user = await this.users.ensureAccount(principal);
     const { rows } = await this.db.query<{ id: string; verified: boolean; organization_id: string | null }>(
-      `select d.id,d.verified,d.organization_id
+      `select d.id,d.verified,
+              (select m.organization_id
+               from doctor_organization_memberships m
+               where m.doctor_id=d.id and m.active=true
+                 and (m.starts_at is null or m.starts_at<=current_date)
+                 and (m.ends_at is null or m.ends_at>=current_date)
+               order by m.is_primary desc,m.created_at desc limit 1) organization_id
        from doctor_profiles d
        join user_roles r on r.user_id=$1 and r.role='doctor'
        where d.account_user_id=$1`,
@@ -74,6 +80,14 @@ export class MonitoringService {
     const isDoctor = enrollment.doctor_user_id === user.id;
     const isPatient = enrollment.patient_owner_user_id === user.id;
     if (!isDoctor && !isPatient) throw new ForbiddenException("Not a participant of this monitoring enrollment");
+    if (isDoctor) {
+      if (!principal.roles.includes("doctor")) throw new ForbiddenException("Doctor role is required");
+      const { rows: roles } = await this.db.query(
+        "select 1 from user_roles where user_id=$1 and role='doctor'",
+        [user.id],
+      );
+      if (!roles.length) throw new ForbiddenException("Doctor role has been revoked");
+    }
     return { user, enrollment, role: (isDoctor ? "doctor" : "patient") as "doctor" | "patient" };
   }
 
@@ -190,6 +204,20 @@ export class MonitoringService {
     if (!Number.isFinite(input.value)) throw new UnprocessableEntityException("Measurement value is invalid");
 
     const result = await this.db.tx(async (client) => {
+      // Lock enrollment to prevent accepting measurements after a concurrent
+      // pause/cancellation. The owner check above controls data access.
+      const { rows: active } = await client.query<{ id: string }>(
+        "select id from patient_monitoring_enrollments where id=$1 and status='active' for update",
+        [enrollmentId],
+      );
+      if (!active.length) throw new ConflictException("Enrollment is not active");
+      if (input.deviceId) {
+        const { rows: device } = await client.query<{ id: string }>(
+          "select id from medical_devices where id=$1 and patient_profile_id=$2 and active=true",
+          [input.deviceId, enrollment.patient_profile_id],
+        );
+        if (!device.length) throw new ForbiddenException("Device does not belong to this patient or is inactive");
+      }
       const inserted = await client.query<{ id: string }>(
         `insert into measurements(enrollment_id,device_id,metric,value,unit,measured_at,source,recorded_by_user_id)
          values ($1,$2,$3,$4,$5,coalesce($6::timestamptz,now()),'manual',$7) returning id`,
@@ -265,8 +293,12 @@ export class MonitoringService {
     if (input.minValue !== undefined && input.maxValue !== undefined && input.minValue >= input.maxValue) {
       throw new UnprocessableEntityException("minValue must be lower than maxValue");
     }
-    const program = await this.db.query<{ id: string }>(`select id from monitoring_programs where id=$1`, [programId]);
+    const program = await this.db.query<{ id: string; created_by_user_id: string; active: boolean }>(
+      `select id,created_by_user_id,active from monitoring_programs where id=$1`, [programId],
+    );
     if (!program.rows[0]) throw new NotFoundException("Monitoring program not found");
+    if (!program.rows[0].active || program.rows[0].created_by_user_id !== user.id)
+      throw new ForbiddenException("Only the active program owner can configure thresholds");
 
     const { rows } = await this.db.query<{ id: string }>(
       `insert into measurement_thresholds(program_id,metric,min_value,max_value,severity)
