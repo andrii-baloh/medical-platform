@@ -31,6 +31,24 @@ type PaymentRow = {
   paid_at: Date | null;
 };
 
+/**
+ * Reject stale/out-of-order provider updates. Payment transitions are serialized
+ * by SELECT ... FOR UPDATE in processWebhook.
+ */
+export function canAdvancePaymentStatus(current: string, next: string): boolean {
+  const allowed: Record<string, readonly string[]> = {
+    created: ["pending", "authorized", "paid", "failed", "cancelled"],
+    pending: ["authorized", "paid", "failed", "cancelled"],
+    authorized: ["paid", "failed", "cancelled"],
+    paid: ["partially_refunded", "refunded"],
+    partially_refunded: ["refunded"],
+    refunded: [],
+    failed: [],
+    cancelled: [],
+  };
+  return Boolean(allowed[current]?.includes(next));
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -238,6 +256,16 @@ export class PaymentsService {
           [payment.id, this.provider.name, event.providerEventId, event.eventType, payloadSha256],
         );
         if (!inserted.rows[0]) return { duplicate: true, paymentId: payment.id, status: payment.status };
+
+        if (!canAdvancePaymentStatus(payment.status, event.status)) {
+          // Record the verified event, but don't reverse a settled or final
+          // payment when a delayed or contradictory callback arrives.
+          await client.query(
+            "update payment_events set processing_status='processed',processed_at=now() where id=$1",
+            [inserted.rows[0].id],
+          );
+          return { duplicate: true, paymentId: payment.id, status: payment.status };
+        }
 
         await client.query(
           `update payments
