@@ -26,6 +26,7 @@ const items = [
   { href: "/admin/support", label: "Поддержка", icon: ChatBubbleLeftRightIcon },
   { href: "/admin/notifications", label: "Доставка", icon: EnvelopeIcon },
   { href: "/admin/audit", label: "Аудит", icon: ClipboardDocumentListIcon },
+  { href: "/admin/security-incidents", label: "Инциденты", icon: ShieldCheckIcon },
 ] as const;
 
 function active(pathname: string, href: string) {

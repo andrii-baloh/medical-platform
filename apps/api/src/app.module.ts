@@ -33,7 +33,7 @@ import { CommercialServicesModule } from "./commercial-services/commercial-servi
 import { TelemedicineModule } from "./telemedicine/telemedicine.module";
 import { ConsultationMaterialsModule } from "./consultation-materials/consultation-materials.module";
 import { RetentionModule } from "./retention/retention.module";
-import { SecurityIncidentsModule } from "./incidents/security-incidents.module";
+import { SecurityIncidentsModule } from "./security-incidents/security-incidents.module";
 import { MonitoringModule } from "./monitoring/monitoring.module";
 import { validateEnv } from "./config/env";
 
