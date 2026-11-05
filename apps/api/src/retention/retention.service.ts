@@ -166,6 +166,71 @@ export class RetentionService {
     return rows[0];
   }
 
+  /** A class-wide hold overrides every configured retention schedule. */
+  async listLegalHolds(principal: Principal) {
+    await this.requireAdmin(principal);
+    const { rows } = await this.db.query(
+      `select id,data_class,reason,created_by_user_id,created_at,
+              released_by_user_id,released_at,release_reason
+       from retention_legal_holds order by created_at desc limit 200`,
+    );
+    return rows;
+  }
+
+  async createLegalHold(principal: Principal, dataClass: string, reason: string) {
+    const user = await this.requireAdmin(principal);
+    this.assertClass(dataClass);
+    if (!reason?.trim() || reason.trim().length < 10) {
+      throw new BadRequestException("Legal hold reason must be at least 10 characters");
+    }
+    let result: { id: string };
+    try {
+      const { rows } = await this.db.query<{ id: string }>(
+        `insert into retention_legal_holds(data_class,reason,created_by_user_id)
+         values ($1,$2,$3) returning id`,
+        [dataClass, reason.trim(), user.id],
+      );
+      result = rows[0];
+    } catch (error) {
+      if (["23505", "23503"].includes((error as {code?:string}).code ?? "")) {
+        throw new ConflictException("An active hold already exists or the retention policy is missing");
+      }
+      throw error;
+    }
+    await this.audit.record({
+      actorUserId: user.id,
+      actorSubject: principal.sub,
+      action: "retention.legal_hold.create",
+      resourceType: "retention_legal_hold",
+      resourceId: result.id,
+      metadata: { dataClass },
+    });
+    return { id: result.id, dataClass, active: true };
+  }
+
+  async releaseLegalHold(principal: Principal, id: string, reason: string) {
+    const user = await this.requireAdmin(principal);
+    if (!reason?.trim() || reason.trim().length < 10) {
+      throw new BadRequestException("Release reason must be at least 10 characters");
+    }
+    const { rows } = await this.db.query<{ data_class: string }>(
+      `update retention_legal_holds
+       set released_by_user_id=$2,released_at=now(),release_reason=$3
+       where id=$1 and released_at is null returning data_class`,
+      [id, user.id, reason.trim()],
+    );
+    if (!rows[0]) throw new NotFoundException("Active legal hold not found");
+    await this.audit.record({
+      actorUserId: user.id,
+      actorSubject: principal.sub,
+      action: "retention.legal_hold.release",
+      resourceType: "retention_legal_hold",
+      resourceId: id,
+      metadata: { dataClass: rows[0].data_class },
+    });
+    return { id, active: false };
+  }
+
   private async loadPolicy(dataClass: RetentionDataClass) {
     const { rows } = await this.db.query<RetentionPolicyRow>(
       `select id,data_class,retention_days,action,legal_basis,active,updated_at from retention_policies where data_class=$1`,
@@ -225,6 +290,13 @@ export class RetentionService {
     if (!policy) throw new ConflictException("Retention policy is not configured for this class");
     if (!policy.active) throw new ConflictException("Retention policy is not active");
     if (!policy.legal_basis) throw new ConflictException("Retention policy has no legal basis");
+    const { rows: holds } = await this.db.query(
+      "select 1 from retention_legal_holds where data_class=$1 and released_at is null",
+      [dataClass],
+    );
+    if (holds.length) throw new ConflictException("Retention legal hold is active for this data class");
+    // The SQL triggers enforce the hold again during each mutation, even if a
+    // hold is registered after this early check.
     const cutoff = this.cutoff(policy);
 
     let runId: string;

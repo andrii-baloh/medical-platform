@@ -1,6 +1,6 @@
 # Stage 17 — retention
 
-Status: source-complete, runtime-unverified (no Docker/PostgreSQL on this workstation).
+Status: PostgreSQL migration and class-wide legal-hold safety tested on Orest PC; unattended retention execution remains blocked pending independent review. See `STAGE17_LEGAL_HOLD_AUDIT.md`.
 No retention period is invented by the platform and no destructive job is enabled by default.
 
 ## Principle
@@ -45,7 +45,10 @@ the reason instead of pretending to delete something.
 - `POST /v1/admin/retention/policies/:dataClass/preview` — cutoff and number of eligible rows,
   read-only;
 - `POST /v1/admin/retention/policies/:dataClass/run` — journaled execution;
-- `GET /v1/admin/retention/runs` — recent runs.
+- `GET /v1/admin/retention/runs` — recent runs;
+- `GET /v1/admin/retention/legal-holds` — legal-hold register;
+- `POST /v1/admin/retention/legal-holds` — establish a class-wide hold with a reason;
+- `POST /v1/admin/retention/legal-holds/:id/release` — release a hold with a documented reason.
 
 Every policy change and every execution is also written to `audit_events`.
 
@@ -75,9 +78,7 @@ across several runs instead of one unbounded transaction.
 
 ## Production blockers (must be closed before real data)
 
-1. **Legal hold.** There is no litigation/regulatory hold concept yet: a hold must be able to freeze
-   a policy and every object it covers before any destructive run happens. This is mandatory — a
-   retention job must never delete data that is under hold.
+1. **Legal hold review.** Migration `035` implements class-wide legal holds and database-level guards for the two existing deletion executors. The SQL safety test passes. Per-case holds, operational approvals, DBA privilege restrictions and independent review remain outstanding. See `STAGE17_LEGAL_HOLD_AUDIT.md`.
 2. Storage-aware document purge: today document retention is a soft delete only; MinIO objects and
    version history remain.
 3. Abandoned runs: a crash leaves `retention_runs.status='running'`, which blocks that class until

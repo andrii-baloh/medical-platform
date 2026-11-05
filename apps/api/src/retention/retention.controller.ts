@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { Principal } from "../auth/principal";
-import { UpsertRetentionPolicyDto } from "./retention.dto";
+import { CreateRetentionHoldDto, ReleaseRetentionHoldDto, UpsertRetentionPolicyDto } from "./retention.dto";
 import { RetentionService } from "./retention.service";
 
 /**
@@ -36,6 +36,25 @@ export class RetentionController {
   @Post("policies/:dataClass/run")
   run(@CurrentPrincipal() principal: Principal, @Param("dataClass") dataClass: string) {
     return this.retention.execute(principal, dataClass);
+  }
+
+  @Get("legal-holds")
+  listLegalHolds(@CurrentPrincipal() principal: Principal) {
+    return this.retention.listLegalHolds(principal);
+  }
+
+  @Post("legal-holds")
+  createLegalHold(@CurrentPrincipal() principal: Principal, @Body() body: CreateRetentionHoldDto) {
+    return this.retention.createLegalHold(principal, body.dataClass, body.reason);
+  }
+
+  @Post("legal-holds/:id/release")
+  releaseLegalHold(
+    @CurrentPrincipal() principal: Principal,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: ReleaseRetentionHoldDto,
+  ) {
+    return this.retention.releaseLegalHold(principal, id, body.reason);
   }
 
   @Get("runs")

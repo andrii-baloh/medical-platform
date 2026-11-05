@@ -11,6 +11,21 @@ export const RETENTION_DATA_CLASSES = [
 
 export type RetentionDataClass = (typeof RETENTION_DATA_CLASSES)[number];
 
+export class CreateRetentionHoldDto {
+  @IsIn(RETENTION_DATA_CLASSES)
+  dataClass!: RetentionDataClass;
+
+  @IsString()
+  @MaxLength(2000)
+  reason!: string;
+}
+
+export class ReleaseRetentionHoldDto {
+  @IsString()
+  @MaxLength(2000)
+  reason!: string;
+}
+
 export class UpsertRetentionPolicyDto {
   @IsOptional()
   @IsInt()
