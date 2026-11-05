@@ -30,6 +30,7 @@ import { RepresentativesModule } from "./representatives/representatives.module"
 import { EsiaIdentityModule } from "./identity/esia-identity.module";
 import { EgiszIntegrationModule } from "./integrations/egisz/egisz-integration.module";
 import { CommercialServicesModule } from "./commercial-services/commercial-services.module";
+import { SecurityIncidentsModule } from "./security-incidents/security-incidents.module";
 import { validateEnv } from "./config/env";
 
 @Module({
@@ -64,6 +65,7 @@ import { validateEnv } from "./config/env";
     EsiaIdentityModule,
     EgiszIntegrationModule,
     CommercialServicesModule,
+    SecurityIncidentsModule,
   ],
   controllers: [HealthController],
 })
