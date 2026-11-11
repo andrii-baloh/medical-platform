@@ -38,6 +38,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Whitespace check
+        if: ${{ always() }}
         run: git diff --check
 
   trivy:
