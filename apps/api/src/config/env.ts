@@ -114,6 +114,9 @@ export function validateEnv(input: Record<string, unknown>) {
     if (offenders.length) {
       throw new Error(`Unsafe production configuration: ${offenders.join(", ")} still contain development placeholders`);
     }
+    if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
+      throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
+    }
     if (merged.RATE_LIMIT_ENABLED === "false") {
       throw new Error("RATE_LIMIT_ENABLED must not be disabled in production");
     }
