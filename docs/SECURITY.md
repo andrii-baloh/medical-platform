@@ -118,3 +118,16 @@ definitions, not evidence.
 10. Security review of the deployment contour by the customer's security function.
 
 Until these are closed, the platform must not be described as production-ready.
+
+
+## Dependency security findings — GitHub Actions, 2026-11-11
+
+Evidence: [CI run 43103159346](https://github.com/andrii-baloh/medical-platform/actions/runs/43103159346), commit `5510a08`. API/Web typecheck, 24 Vitest tests and production build **passed**. The overall workflow **failed** because both vulnerability gates detected findings. Do not bypass these gates.
+
+- `multer@2.4.0`: HIGH denial-of-service on aborted requests with asynchronous file filtering; Trivy CVE-2026-113872 / npm GHSA-q7qp-rjg7-q26m. Trivy reports fixed version `2.5.0`. Transitive dependency of `@nestjs/platform-express`.
+- `postcss@8.4.31`: two HIGH findings in Trivy (CVE-2026-45623, CVE-2026-73646); npm also reports multiple PostCSS advisories. Dependency supplied through `next`; `npm audit fix --force` proposes `next@16.4.6`, a breaking major upgrade requiring compatibility testing.
+- `fast-xml-parser<=5.11.2`: npm reports quadratic CPU consumption (GHSA-474x-hrwr-fgx4), with a non-forced `npm audit fix` available.
+
+Remediation: upgrade to registry-confirmed patched releases, regenerate and commit `package-lock.json`, then run `npm ci`, API/Web typecheck, Vitest, production build, `npm audit --omit=dev --audit-level=high` and Trivy. For PostCSS, test a supported patched Next.js release or a narrowly scoped compatible override; do not suppress findings or force an untested major upgrade. Repeat clinical/runtime regressions after framework changes.
+
+Open-source scanner upstreams: [npm CLI](https://github.com/npm/cli) (Artistic-2.0), [Trivy](https://github.com/aquasecurity/trivy) (Apache-2.0), [Vitest](https://github.com/vitest-dev/vitest) (MIT). No third-party source code copied.
