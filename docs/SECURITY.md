@@ -13,7 +13,7 @@ configuration.
 | MFA for staff | `REQUIRE_PRIVILEGED_MFA` with AMR/ACR checks for privileged roles; production now refuses startup if it is disabled | `auth/oidc.guard.ts`, `config/env.ts` | startup guard unit tests; Keycloak live flow remains unverified |
 | Authorization | Per-resource server-side checks (owner, doctor relationship, grant, admin role) | each module | source review |
 | Denied access audit | `outcome: "denied"` events written before refusing | documents, consultation materials, telemedicine, admin | source |
-| Rate limiting | Per-identity/IP read and write buckets | `auth/rate-limit.guard.ts` | source |
+| Rate limiting | Per-identity/TCP-peer read and write buckets; forwarded headers cannot select a new bucket | `auth/rate-limit.guard.ts` | spoofing regression tests added; distributed runtime unverified |
 | Upload validation | size, declared MIME, magic bytes, optional SHA-256, quarantine + scanner | `documents/documents.service.ts` | source |
 | Security headers (web) | nosniff, referrer policy, permissions policy | `apps/web/next.config.ts` | source |
 | Security headers (API) | nosniff, frame deny, no-referrer, COOP/CORP, no-store | `apps/api/src/main.ts` | source + boot |
@@ -47,6 +47,10 @@ Still open:
 | Session policy | token lifetime/refresh owned by the IdP; no revocation list in the API | blocker |
 | Threat model review | drafted below, not reviewed with the customer | partial |
 | Incident response | Stage 21 | planned |
+
+### Reverse-proxy rate-limit limitation
+
+Anonymous requests are currently bucketed by the actual TCP peer, not by client-supplied `X-Forwarded-For`. This prevents spoofed headers from bypassing throttling, but clients behind one ingress proxy share a bucket. Before exposing production traffic, implement a trusted-proxy allowlist and shared distributed rate-limit store (for example Redis) or enforce anonymous throttling at the ingress. `TRUST_PROXY=true` alone does **not** authorize trusting arbitrary forwarding headers.
 
 ## 3. Threat model (draft)
 
