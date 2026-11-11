@@ -10,7 +10,7 @@ configuration.
 | Area | Mechanism | Where | How it was verified |
 |---|---|---|---|
 | Authentication | OIDC bearer token: signature, issuer, audience | `auth/oidc.guard.ts` | source + API boot |
-| MFA for staff | `REQUIRE_PRIVILEGED_MFA` with AMR/ACR checks for privileged roles | `auth/oidc.guard.ts`, `config/env.ts` | source only |
+| MFA for staff | `REQUIRE_PRIVILEGED_MFA` with AMR/ACR checks for privileged roles; production now refuses startup if it is disabled | `auth/oidc.guard.ts`, `config/env.ts` | startup guard unit tests; Keycloak live flow remains unverified |
 | Authorization | Per-resource server-side checks (owner, doctor relationship, grant, admin role) | each module | source review |
 | Denied access audit | `outcome: "denied"` events written before refusing | documents, consultation materials, telemedicine, admin | source |
 | Rate limiting | Per-identity/IP read and write buckets | `auth/rate-limit.guard.ts` | source |
@@ -26,7 +26,7 @@ configuration.
 Closed in this stage:
 
 - API baseline security headers (previously none);
-- production configuration guard against development placeholders;
+- production configuration guard against development placeholders and disabled privileged MFA;
 - denied-access audit events (previously documented but not emitted);
 - isolated local test contour definition and lifecycle scripts;
 - backup/restore scripts with explicit destructive confirmation;
@@ -36,7 +36,7 @@ Still open:
 
 | Gap | Why it matters | Status |
 |---|---|---|
-| MFA enforcement not runtime-tested | MFA is only a claim until a privileged login is exercised | blocker |
+| MFA enforcement not runtime-tested | Production startup now rejects `REQUIRE_PRIVILEGED_MFA=false`, but the Keycloak flow and privileged login still require real E2E checks | blocker |
 | RBAC not exercised against a live database | permission matrix is source-inspected only | blocker |
 | Encryption at rest and in transit | DB/object-storage TLS, disk encryption and key custody are deployment responsibilities | blocker |
 | Secrets management | placeholders are rejected in production, but no vault/KMS integration exists | blocker |
