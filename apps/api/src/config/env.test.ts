@@ -90,10 +90,12 @@ describe("production configuration safety", () => {
     ["LIVEKIT_URL", "http://livekit.internal"],
     ["LIVEKIT_PUBLIC_URL", "ws://video.example.org"],
     ["LIVEKIT_PUBLIC_URL", "https://user:password@video.example.org"],
+    ["LIVEKIT_URL", "https://livekit.internal?token=secret"],
+    ["LIVEKIT_PUBLIC_URL", "wss://video.example.org#debug"],
   ] as const)("rejects insecure video endpoint %s", (key, value) => {
     process.env.NODE_ENV = "production";
     expect(() => validateEnv({ ...fixture, [key]: value }))
-      .toThrow(`${key} must be an HTTPS or WSS URL in production`);
+      .toThrow(`${key} must be an HTTPS or WSS URL without credentials, query or fragment in production`);
   });
 
   it("accepts encrypted LiveKit API and browser endpoints", () => {
