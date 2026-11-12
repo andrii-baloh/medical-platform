@@ -159,3 +159,9 @@ Open-source scanner upstreams: [npm CLI](https://github.com/npm/cli) (Artistic-2
 The API now refuses production startup unless `LIVEKIT_URL`, `LIVEKIT_PUBLIC_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are configured. Both URLs must use encrypted `https://` or `wss://` transport and must not contain embedded credentials. The existing LiveKit server SDK (`livekit-server-sdk` ^2.19.1, Apache-2.0) remains the provider adapter; no dependency was added. Regression tests cover missing credentials and insecure endpoints.
 
 This is configuration validation only. It does **not** prove LiveKit connectivity, TLS certificate validity, country-specific media residency, TURN routing, or an end-to-end clinical video call. Those remain production acceptance blockers.
+
+## Medical object storage production gate (2026-11-12)
+
+Production API startup now requires an explicit `S3_ENDPOINT` using HTTPS without URL-embedded credentials or query parameters, plus nonempty `S3_ACCESS_KEY` and `S3_SECRET_KEY`. This avoids an implicit S3 destination or plaintext transport for clinical uploads. Six Vitest cases cover the new validation. Existing AWS SDK for JavaScript v3 (`@aws-sdk/client-s3` ^3.879.0, Apache-2.0, upstream: https://github.com/aws/aws-sdk-js-v3) is retained; no new dependency or copied upstream source.
+
+This configuration gate does not verify server certificate trust, region/data residency, bucket policy, server-side encryption, credentials validity or key rotation. Those remain live deployment acceptance checks. Dependency vulnerability CI gates remain failing independently and must not be bypassed.
