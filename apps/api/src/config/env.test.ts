@@ -28,9 +28,34 @@ const fixture = {
   DOCUMENT_SCAN_PROVIDER: "clamav",
   DOCUMENT_SCAN_WORKER_ENABLED: "true",
   CORS_ORIGINS: "https://patient.example.org",
+  LIVEKIT_URL: "https://livekit-api.internal",
+  LIVEKIT_PUBLIC_URL: "wss://video.example.org",
+  LIVEKIT_API_KEY: "medicare-livekit",
+  LIVEKIT_API_SECRET: "secure-livekit-secret",
 };
 
 describe("production configuration safety", () => {
+  it("rejects missing LiveKit credentials", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, LIVEKIT_API_SECRET: undefined }))
+      .toThrow("Production LiveKit credentials and both endpoints are required");
+  });
+
+  it.each([
+    ["LIVEKIT_URL", "http://livekit.internal"],
+    ["LIVEKIT_PUBLIC_URL", "ws://video.example.org"],
+    ["LIVEKIT_PUBLIC_URL", "https://user:password@video.example.org"],
+  ] as const)("rejects insecure video endpoint %s", (key, value) => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, [key]: value }))
+      .toThrow(`${key} must be an HTTPS or WSS URL in production`);
+  });
+
+  it("accepts encrypted LiveKit API and browser endpoints", () => {
+    process.env.NODE_ENV = "production";
+    expect(validateEnv(fixture).LIVEKIT_PUBLIC_URL).toBe("wss://video.example.org");
+  });
+
   it("rejects simulated payment provider in production", () => {
     process.env.NODE_ENV = "production";
     expect(() => validateEnv({ ...fixture, PAYMENT_PROVIDER: "development" }))
