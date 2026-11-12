@@ -38,6 +38,23 @@ const fixture = {
 };
 
 describe("production configuration safety", () => {
+  it.each([
+    ["OIDC_ISSUER_URL", "http://identity.internal/realms/medicare"],
+    ["OIDC_JWKS_URL", "http://identity.internal/certs"],
+    ["OIDC_ISSUER_URL", "https://user:pass@identity.internal/realms/medicare"],
+    ["OIDC_JWKS_URL", "https://identity.internal/certs?key=secret"],
+    ["OIDC_JWKS_URL", "https://identity.internal/certs#fragment"],
+  ] as const)("rejects unsafe production identity endpoint %s: %s", (key, value) => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, [key]: value }))
+      .toThrow(`${key} must be an HTTPS URL without credentials, query or fragment in production`);
+  });
+
+  it("accepts encrypted production identity endpoints", () => {
+    process.env.NODE_ENV = "production";
+    expect(validateEnv(fixture).OIDC_JWKS_URL).toBe(fixture.OIDC_JWKS_URL);
+  });
+
   it("rejects implicit S3 endpoint in production", () => {
     process.env.NODE_ENV = "production";
     expect(() => validateEnv({ ...fixture, S3_ENDPOINT: undefined }))
