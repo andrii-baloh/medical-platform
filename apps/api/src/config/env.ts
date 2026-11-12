@@ -114,6 +114,19 @@ export function validateEnv(input: Record<string, unknown>) {
     if (offenders.length) {
       throw new Error(`Unsafe production configuration: ${offenders.join(", ")} still contain development placeholders`);
     }
+    // Explicit HTTPS origins only: the development localhost default and
+    // wildcard CORS are not suitable for a patient-facing production API.
+    const origins = String(merged.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim());
+    if (origins.some((origin) => {
+      try {
+        const url = new URL(origin);
+        return url.protocol !== "https:" || url.origin !== origin || Boolean(url.username || url.password);
+      } catch {
+        return true;
+      }
+    })) {
+      throw new Error("CORS_ORIGINS must contain only explicit HTTPS origins in production");
+    }
     if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
       throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
     }
