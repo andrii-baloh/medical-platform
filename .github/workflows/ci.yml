@@ -39,6 +39,9 @@ jobs:
       - name: Validate infrastructure configuration (static)
         run: node scripts/check-infra.cjs
 
+      - name: Validate Docker Compose configuration (no daemon)
+        run: docker compose --env-file .env.example config --quiet
+
       - name: Production build
         run: npm run build
 
