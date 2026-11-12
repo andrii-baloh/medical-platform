@@ -35,6 +35,8 @@ or fiscal receipt reconciliation. Those remain deployment acceptance tests.
 Upstream integration: `@robokassa/sdk` ^1.0.0 (MIT; existing dependency).
 No new dependency was introduced.
 
+Production OIDC endpoint configuration is now fail-closed: both the issuer and remote JWKS URL must use HTTPS without embedded credentials, query parameters or fragments. This is implemented with the existing Node.js URL parser and Zod-based environment validation, and covered by six regression cases. The live Keycloak identity flow, certificate trust, network policy and token revocation still require deployment-level verification.
+
 ## 2. Gap analysis after Stage 19
 
 Closed in this stage:
