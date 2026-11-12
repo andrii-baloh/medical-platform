@@ -21,6 +21,20 @@ configuration.
 | Secrets hygiene | no secrets in git, `.env*` ignored, placeholders only | `.gitignore`, `.env.example` | `git status` |
 | Audit integrity | append-only events, no clinical text, retention refused for `audit_logs` | `audit/*`, `retention/*` | source |
 
+## Production payment safety gate (2026-11-12)
+
+The API now refuses production startup when `PAYMENT_PROVIDER=development`,
+`ROBOKASSA_TEST_MODE=true`, or the required Robokassa merchant credentials
+(`ROBOKASSA_MERCHANT_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`)
+are absent. The development adapter remains available outside production.
+Four Vitest cases cover the gate in `apps/api/src/config/env.test.ts`.
+
+This prevents simulated payment acceptance in production; it does **not**
+validate real acquiring, callback signature delivery, refunds, KKT registration,
+or fiscal receipt reconciliation. Those remain deployment acceptance tests.
+Upstream integration: `@robokassa/sdk` ^1.0.0 (MIT; existing dependency).
+No new dependency was introduced.
+
 ## 2. Gap analysis after Stage 19
 
 Closed in this stage:
