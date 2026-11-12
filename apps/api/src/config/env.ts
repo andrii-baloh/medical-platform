@@ -127,6 +127,16 @@ export function validateEnv(input: Record<string, unknown>) {
     })) {
       throw new Error("CORS_ORIGINS must contain only explicit HTTPS origins in production");
     }
+    // A production deployment must not issue simulated payment confirmations.
+    if (merged.PAYMENT_PROVIDER !== "robokassa") {
+      throw new Error("PAYMENT_PROVIDER must be robokassa in production");
+    }
+    if (merged.ROBOKASSA_TEST_MODE !== "false") {
+      throw new Error("ROBOKASSA_TEST_MODE must be disabled in production");
+    }
+    if (!merged.ROBOKASSA_MERCHANT_LOGIN || !merged.ROBOKASSA_PASSWORD1 || !merged.ROBOKASSA_PASSWORD2) {
+      throw new Error("Production Robokassa credentials are required");
+    }
     if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
       throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
     }
