@@ -137,6 +137,21 @@ export function validateEnv(input: Record<string, unknown>) {
     if (!merged.ROBOKASSA_MERCHANT_LOGIN || !merged.ROBOKASSA_PASSWORD1 || !merged.ROBOKASSA_PASSWORD2) {
       throw new Error("Production Robokassa credentials are required");
     }
+    // Video consultations must never silently run without a configured SFU.
+    // Both API and browser-facing endpoints must use encrypted transport.
+    if (!merged.LIVEKIT_API_KEY || !merged.LIVEKIT_API_SECRET || !merged.LIVEKIT_URL || !merged.LIVEKIT_PUBLIC_URL) {
+      throw new Error("Production LiveKit credentials and both endpoints are required");
+    }
+    for (const key of ["LIVEKIT_URL", "LIVEKIT_PUBLIC_URL"] as const) {
+      try {
+        const url = new URL(String(merged[key]));
+        if (!["https:", "wss:"].includes(url.protocol) || !url.hostname || url.username || url.password) {
+          throw new Error("insecure");
+        }
+      } catch {
+        throw new Error(`${key} must be an HTTPS or WSS URL in production`);
+      }
+    }
     if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
       throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
     }
