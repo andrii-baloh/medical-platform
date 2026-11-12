@@ -30,6 +30,9 @@ jobs:
       - name: Typecheck API and Web
         run: npm run typecheck
 
+      - name: Typecheck API test sources
+        run: npm run typecheck:test --workspace @medicare/api
+
       - name: API unit tests (Vitest)
         run: npm run test --workspace @medicare/api
 
