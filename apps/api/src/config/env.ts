@@ -117,6 +117,13 @@ export function validateEnv(input: Record<string, unknown>) {
     if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
       throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
     }
+    // Never mark uploaded clinical files as clean without an actual scanner.
+    if (merged.DOCUMENT_SCAN_PROVIDER !== "clamav") {
+      throw new Error("DOCUMENT_SCAN_PROVIDER must be clamav in production");
+    }
+    if (merged.DOCUMENT_SCAN_WORKER_ENABLED !== "true") {
+      throw new Error("DOCUMENT_SCAN_WORKER_ENABLED must be enabled in production");
+    }
     if (merged.RATE_LIMIT_ENABLED === "false") {
       throw new Error("RATE_LIMIT_ENABLED must not be disabled in production");
     }
