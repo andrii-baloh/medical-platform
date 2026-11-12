@@ -158,11 +158,12 @@ export function validateEnv(input: Record<string, unknown>) {
     for (const key of ["LIVEKIT_URL", "LIVEKIT_PUBLIC_URL"] as const) {
       try {
         const url = new URL(String(merged[key]));
-        if (!["https:", "wss:"].includes(url.protocol) || !url.hostname || url.username || url.password) {
+        if (!["https:", "wss:"].includes(url.protocol) || !url.hostname ||
+            url.username || url.password || url.search || url.hash) {
           throw new Error("insecure");
         }
       } catch {
-        throw new Error(`${key} must be an HTTPS or WSS URL in production`);
+        throw new Error(`${key} must be an HTTPS or WSS URL without credentials, query or fragment in production`);
       }
     }
     // Explicit encrypted object storage is mandatory for clinical files.
