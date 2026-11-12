@@ -20,12 +20,40 @@ const fixture = {
   S3_REGION: "eu-central-1",
   S3_BUCKET_MEDICAL: "medicare-test-files",
   REQUIRE_PRIVILEGED_MFA: "true",
+  PAYMENT_PROVIDER: "robokassa",
+  ROBOKASSA_TEST_MODE: "false",
+  ROBOKASSA_MERCHANT_LOGIN: "medicare-merchant",
+  ROBOKASSA_PASSWORD1: "secure-payment-secret-one",
+  ROBOKASSA_PASSWORD2: "secure-payment-secret-two",
   DOCUMENT_SCAN_PROVIDER: "clamav",
   DOCUMENT_SCAN_WORKER_ENABLED: "true",
   CORS_ORIGINS: "https://patient.example.org",
 };
 
 describe("production configuration safety", () => {
+  it("rejects simulated payment provider in production", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, PAYMENT_PROVIDER: "development" }))
+      .toThrow("PAYMENT_PROVIDER must be robokassa in production");
+  });
+
+  it("rejects Robokassa test mode in production", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, ROBOKASSA_TEST_MODE: "true" }))
+      .toThrow("ROBOKASSA_TEST_MODE must be disabled in production");
+  });
+
+  it("rejects missing Robokassa credentials in production", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, ROBOKASSA_PASSWORD2: undefined }))
+      .toThrow("Production Robokassa credentials are required");
+  });
+
+  it("accepts configured production payment provider", () => {
+    process.env.NODE_ENV = "production";
+    expect(validateEnv(fixture).PAYMENT_PROVIDER).toBe("robokassa");
+  });
+
   it("rejects startup when privileged MFA is disabled", () => {
     process.env.NODE_ENV = "production";
     expect(() =>
