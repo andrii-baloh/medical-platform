@@ -36,6 +36,9 @@ jobs:
       - name: API unit tests (Vitest)
         run: npm run test --workspace @medicare/api
 
+      - name: Validate infrastructure configuration (static)
+        run: node scripts/check-infra.cjs
+
       - name: Production build
         run: npm run build
 
