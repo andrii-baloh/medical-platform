@@ -114,6 +114,19 @@ export function validateEnv(input: Record<string, unknown>) {
     if (offenders.length) {
       throw new Error(`Unsafe production configuration: ${offenders.join(", ")} still contain development placeholders`);
     }
+    // Identity metadata and signing keys must be fetched over authenticated TLS.
+    // Never allow credentials or URL fragments in configured OIDC endpoints.
+    for (const key of ["OIDC_ISSUER_URL", "OIDC_JWKS_URL"] as const) {
+      try {
+        const url = new URL(String(merged[key]));
+        if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
+            url.search || url.hash) {
+          throw new Error("insecure");
+        }
+      } catch {
+        throw new Error(`${key} must be an HTTPS URL without credentials, query or fragment in production`);
+      }
+    }
     // Explicit HTTPS origins only: the development localhost default and
     // wildcard CORS are not suitable for a patient-facing production API.
     const origins = String(merged.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim());
