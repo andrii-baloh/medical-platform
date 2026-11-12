@@ -122,6 +122,12 @@ definitions, not evidence.
 Until these are closed, the platform must not be described as production-ready.
 
 
+## Production CORS configuration gate — 2026-11-12
+
+The API uses NestJS 11 / Express 5 CORS support (MIT) and Zod 4 validation (MIT); no third-party source code was copied and no new dependency was introduced. The production startup guard now rejects the development `http://localhost:3000` default, wildcard origins, non-HTTPS origins, URL paths, and credential-bearing origins in `CORS_ORIGINS`. Configure a comma-separated allowlist of exact HTTPS origins for the deployed web clients. Development remains unchanged. The API's existing `enableCors` uses that same environment variable.
+
+This is an origin allowlist, not an authentication or CSRF substitute. Deployment still requires TLS termination, correctly configured reverse proxies, verified session protections, and real end-to-end authorization tests. CI checks are tracked separately; code commits do not imply tests passed.
+
 ## Dependency security findings — GitHub Actions, 2026-11-11
 
 Evidence: [CI run 43103159346](https://github.com/andrii-baloh/medical-platform/actions/runs/43103159346), commit `5510a08`. API/Web typecheck, 24 Vitest tests and production build **passed**. The overall workflow **failed** because both vulnerability gates detected findings. Do not bypass these gates.
