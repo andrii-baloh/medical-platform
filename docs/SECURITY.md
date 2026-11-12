@@ -153,3 +153,9 @@ Evidence: [CI run 43103159346](https://github.com/andrii-baloh/medical-platform/
 Remediation: upgrade to registry-confirmed patched releases, regenerate and commit `package-lock.json`, then run `npm ci`, API/Web typecheck, Vitest, production build, `npm audit --omit=dev --audit-level=high` and Trivy. For PostCSS, test a supported patched Next.js release or a narrowly scoped compatible override; do not suppress findings or force an untested major upgrade. Repeat clinical/runtime regressions after framework changes.
 
 Open-source scanner upstreams: [npm CLI](https://github.com/npm/cli) (Artistic-2.0), [Trivy](https://github.com/aquasecurity/trivy) (Apache-2.0), [Vitest](https://github.com/vitest-dev/vitest) (MIT). No third-party source code copied.
+
+## LiveKit production startup gate (2026-11-12)
+
+The API now refuses production startup unless `LIVEKIT_URL`, `LIVEKIT_PUBLIC_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are configured. Both URLs must use encrypted `https://` or `wss://` transport and must not contain embedded credentials. The existing LiveKit server SDK (`livekit-server-sdk` ^2.19.1, Apache-2.0) remains the provider adapter; no dependency was added. Regression tests cover missing credentials and insecure endpoints.
+
+This is configuration validation only. It does **not** prove LiveKit connectivity, TLS certificate validity, country-specific media residency, TURN routing, or an end-to-end clinical video call. Those remain production acceptance blockers.
