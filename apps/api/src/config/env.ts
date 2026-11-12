@@ -152,6 +152,22 @@ export function validateEnv(input: Record<string, unknown>) {
         throw new Error(`${key} must be an HTTPS or WSS URL in production`);
       }
     }
+    // Explicit encrypted object storage is mandatory for clinical files.
+    if (!merged.S3_ENDPOINT) {
+      throw new Error("S3_ENDPOINT must be explicitly configured in production");
+    }
+    try {
+      const endpoint = new URL(String(merged.S3_ENDPOINT));
+      if (endpoint.protocol !== "https:" || !endpoint.hostname ||
+          endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+        throw new Error("insecure");
+      }
+    } catch {
+      throw new Error("S3_ENDPOINT must be an HTTPS URL without credentials or query parameters in production");
+    }
+    if (!merged.S3_ACCESS_KEY || !merged.S3_SECRET_KEY) {
+      throw new Error("Production S3 credentials are required");
+    }
     if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
       throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
     }
