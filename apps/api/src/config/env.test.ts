@@ -18,6 +18,9 @@ const fixture = {
   OIDC_JWKS_URL: "https://identity.internal/realms/medicare/protocol/openid-connect/certs",
   OIDC_AUDIENCE: "medicare-api",
   S3_REGION: "eu-central-1",
+  S3_ENDPOINT: "https://storage.internal",
+  S3_ACCESS_KEY: "medical-storage-access",
+  S3_SECRET_KEY: "medical-storage-secret",
   S3_BUCKET_MEDICAL: "medicare-test-files",
   REQUIRE_PRIVILEGED_MFA: "true",
   PAYMENT_PROVIDER: "robokassa",
@@ -35,6 +38,31 @@ const fixture = {
 };
 
 describe("production configuration safety", () => {
+  it("rejects implicit S3 endpoint in production", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, S3_ENDPOINT: undefined }))
+      .toThrow("S3_ENDPOINT must be explicitly configured in production");
+  });
+
+  it.each(["http://storage.internal", "https://user:pass@storage.internal", "https://storage.internal?token=secret"])(
+    "rejects unsafe S3 endpoint %s", (endpoint) => {
+      process.env.NODE_ENV = "production";
+      expect(() => validateEnv({ ...fixture, S3_ENDPOINT: endpoint }))
+        .toThrow("S3_ENDPOINT must be an HTTPS URL without credentials or query parameters in production");
+    },
+  );
+
+  it("rejects missing storage credentials", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, S3_SECRET_KEY: undefined }))
+      .toThrow("Production S3 credentials are required");
+  });
+
+  it("accepts explicit HTTPS S3 endpoint and credentials", () => {
+    process.env.NODE_ENV = "production";
+    expect(validateEnv(fixture).S3_ENDPOINT).toBe("https://storage.internal");
+  });
+
   it("rejects missing LiveKit credentials", () => {
     process.env.NODE_ENV = "production";
     expect(() => validateEnv({ ...fixture, LIVEKIT_API_SECRET: undefined }))
