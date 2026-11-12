@@ -22,6 +22,7 @@ const fixture = {
   REQUIRE_PRIVILEGED_MFA: "true",
   DOCUMENT_SCAN_PROVIDER: "clamav",
   DOCUMENT_SCAN_WORKER_ENABLED: "true",
+  CORS_ORIGINS: "https://patient.example.org",
 };
 
 describe("production configuration safety", () => {
@@ -52,6 +53,26 @@ describe("production configuration safety", () => {
   it("accepts a configured ClamAV scanner and enabled worker", () => {
     process.env.NODE_ENV = "production";
     expect(validateEnv(fixture).DOCUMENT_SCAN_PROVIDER).toBe("clamav");
+  });
+
+  it.each([
+    "http://localhost:3000",
+    "*",
+    "https://patient.example.org, http://localhost:3000",
+    "https://patient.example.org/",
+    "https://user:pass@patient.example.org",
+  ])("rejects insecure CORS origin configuration: %s", (origins) => {
+    process.env.NODE_ENV = "production";
+    expect(() => validateEnv({ ...fixture, CORS_ORIGINS: origins }))
+      .toThrow("CORS_ORIGINS must contain only explicit HTTPS origins in production");
+  });
+
+  it("accepts an explicit HTTPS origin allowlist", () => {
+    process.env.NODE_ENV = "production";
+    expect(validateEnv({
+      ...fixture,
+      CORS_ORIGINS: "https://patient.example.org,https://doctor.example.org",
+    }).CORS_ORIGINS).toContain("https://doctor.example.org");
   });
 
   it("does not impose production-only MFA policy on isolated development", () => {
