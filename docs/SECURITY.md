@@ -17,7 +17,7 @@ configuration.
 | Upload validation | size, declared MIME, magic bytes, optional SHA-256, quarantine + scanner | `documents/documents.service.ts` | source |
 | Security headers (web) | nosniff, referrer policy, permissions policy | `apps/web/next.config.ts` | source |
 | Security headers (API) | nosniff, frame deny, no-referrer, COOP/CORP, no-store | `apps/api/src/main.ts` | source + boot |
-| Production config guard | refuses development placeholders, disabled rate limiting and unset country | `config/env.ts` | source |
+| Production config guard | refuses development placeholders, disabled rate limiting, disabled MFA, bypassed document scanning and unset country | `config/env.ts` | unit tests; live scanner unverified |
 | Secrets hygiene | no secrets in git, `.env*` ignored, placeholders only | `.gitignore`, `.env.example` | `git status` |
 | Audit integrity | append-only events, no clinical text, retention refused for `audit_logs` | `audit/*`, `retention/*` | source |
 
@@ -26,11 +26,13 @@ configuration.
 Closed in this stage:
 
 - API baseline security headers (previously none);
-- production configuration guard against development placeholders and disabled privileged MFA;
+- production configuration guard against development placeholders, disabled privileged MFA and `development-pass` document scanning;
 - denied-access audit events (previously documented but not emitted);
 - isolated local test contour definition and lifecycle scripts;
 - backup/restore scripts with explicit destructive confirmation;
 - dependency and infrastructure audit script.
+
+The production document-scanning guard requires `DOCUMENT_SCAN_PROVIDER=clamav` and `DOCUMENT_SCAN_WORKER_ENABLED=true`. This only validates configuration: ClamAV reachability, signature freshness, queue processing and quarantine-to-clean behavior still need live E2E verification. Development/test environments may continue to use the development adapter with synthetic data only.
 
 Still open:
 
