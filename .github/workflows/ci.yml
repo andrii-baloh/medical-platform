@@ -62,6 +62,51 @@ jobs:
             git diff-tree --check --root -r HEAD
           fi
 
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: medical_ci
+          POSTGRES_PASSWORD: medical_ci_only
+          POSTGRES_DB: medical_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medical_ci -d medical_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://medical_ci:medical_ci_only@localhost:5432/medical_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply database migrations
+        run: npm run migrate --workspace @medicare/api
+      - name: Verify all 33 migrations recorded
+        run: |
+          node --input-type=module -e '
+            import pg from "pg";
+            const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
+            try {
+              const {rows} = await pool.query("select count(*)::int as count from schema_migrations");
+              if (rows[0].count !== 33) throw new Error(`Expected 33 migrations, got ${rows[0].count}`);
+              console.log("Verified 33 applied migrations");
+            } finally { await pool.end(); }
+          '
+      - name: Reapply migrations (idempotency and checksum check)
+        run: npm run migrate --workspace @medicare/api
+
   trivy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
