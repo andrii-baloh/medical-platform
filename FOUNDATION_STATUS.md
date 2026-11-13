@@ -69,7 +69,7 @@ The current source also contains:
 - remote patient monitoring with programs, enrollments, measurements, thresholds, clinical alerts and reviews
 - threshold evaluation inside the measurement transaction, so no out-of-range value exists without an alert
 
-Database migrations currently run from `001_initial.sql` through `033_remote_monitoring.sql`.
+Database migrations currently run from `001_initial.sql` through migration `035` (35 SQL migrations total). The exact migration filenames are maintained in the migrations directory.
 
 ## Validation on 2026-11-03
 
@@ -121,11 +121,7 @@ the migration itself has not been executed because Docker/PostgreSQL are unavail
 
 ## Next roadmap item
 
-The roadmap stages 1–22 are source-complete. The next work is production readiness, not a new
-stage: runtime verification of migrations `001`–`033` and the clinical workflows against an
-isolated Docker contour, closing the Stage 19 security blockers (MFA, RBAC, encryption, secrets,
-verified restore, session revocation, protected logging), legal hold and retention-run recovery,
-and customer sign-off on the Russian deployment cell.
+The clinical roadmap stages 1–22 are source-complete; they are not the entire broader product roadmap. Do not assign new stage numbers without an approved roadmap. The next work is production readiness, not a new clinical stage: the 35 SQL migrations (001–035) passed PostgreSQL 16 GitHub Actions execution and a repeat migrator run in [CI #43442390640](https://github.com/andrii-baloh/medical-platform/actions/runs/43442390640) on 2026-11-13. This does not establish full Docker/E2E readiness. The workflow's dependency security gates (`npm audit` and Trivy) failed and remain blockers. The remaining work includes clinical workflow verification against an isolated Docker contour, closing the Stage 19 security blockers (MFA, RBAC, encryption, secrets, verified restore, session revocation, protected logging), legal hold and retention-run recovery, and customer sign-off on the Russian deployment cell.
 
 ## Not production-complete
 
