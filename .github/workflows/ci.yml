@@ -93,15 +93,15 @@ jobs:
         run: npm ci
       - name: Apply database migrations
         run: npm run migrate --workspace @medicare/api
-      - name: Verify all 33 migrations recorded
+      - name: Verify all 35 migrations recorded
         run: |
           node --input-type=module -e '
             import pg from "pg";
             const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
             try {
               const {rows} = await pool.query("select count(*)::int as count from schema_migrations");
-              if (rows[0].count !== 33) throw new Error(`Expected 33 migrations, got ${rows[0].count}`);
-              console.log("Verified 33 applied migrations");
+              if (rows[0].count !== 35) throw new Error(`Expected 35 migrations, got ${rows[0].count}`);
+              console.log("Verified 35 applied migrations");
             } finally { await pool.end(); }
           '
       - name: Reapply migrations (idempotency and checksum check)
