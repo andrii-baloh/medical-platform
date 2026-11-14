@@ -60,7 +60,7 @@ Still open:
 | Secrets management | placeholders are rejected in production, but no vault/KMS integration exists | blocker |
 | Backup and restore not executed | scripts exist; no restore has ever been verified | blocker |
 | Log protection | access logs contain method/path/status only, but there is no central protected sink | partial |
-| Vulnerability management | `npm audit` script exists; no CI gate, no container scanning | partial |
+| Vulnerability management | GitHub Actions runs production `npm audit --omit=dev --audit-level=high` and Trivy filesystem vulnerability/secret scanning (`aquasecurity/trivy-action@v0.36.0`, HIGH/CRITICAL, `ignore-unfixed: true`, blocking exit code); both failed in CI #43514964135 on 2026-11-14. Container image scanning and remediation are not verified. | blocker |
 | Brute-force / password policy | delegated to Keycloak; realm policy not reviewed here | partial |
 | Session policy | token lifetime/refresh owned by the IdP; no revocation list in the API | blocker |
 | Threat model review | drafted below, not reviewed with the customer | partial |
