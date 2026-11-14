@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "fix/production-readiness-audit"]
   pull_request:
 
 permissions:
@@ -11,10 +11,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -25,14 +27,100 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
+      - name: Typecheck API and Web
         run: npm run typecheck
+
+      - name: Typecheck API test sources
+        run: npm run typecheck:test --workspace @medicare/api
+
+      - name: API unit tests (Vitest)
+        run: npm run test --workspace @medicare/api
+
+      - name: Validate infrastructure configuration (static)
+        run: node scripts/check-infra.cjs
+
+      - name: Validate Docker Compose configuration (no daemon)
+        run: docker compose --env-file .env.example config --quiet
 
       - name: Production build
         run: npm run build
 
-      - name: Critical dependency audit
-        run: npm audit --audit-level=critical
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Whitespace check
-        run: git diff --check
+        if: ${{ always() }}
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ -n "$PR_BASE_SHA" ]; then
+            git diff --check "$PR_BASE_SHA"...HEAD
+          elif [ -n "$PUSH_BEFORE_SHA" ] && git cat-file -e "$PUSH_BEFORE_SHA^{commit}" 2>/dev/null; then
+            git diff --check "$PUSH_BEFORE_SHA" HEAD
+          else
+            git diff-tree --check --root -r HEAD
+          fi
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: medical_ci
+          POSTGRES_PASSWORD: medical_ci_only
+          POSTGRES_DB: medical_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medical_ci -d medical_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://medical_ci:medical_ci_only@localhost:5432/medical_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply database migrations
+        run: npm run migrate --workspace @medicare/api
+      - name: Verify all 35 migrations recorded
+        run: |
+          node --input-type=module -e '
+            import pg from "pg";
+            const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
+            try {
+              const {rows} = await pool.query("select count(*)::int as count from schema_migrations");
+              if (rows[0].count !== 35) throw new Error(`Expected 35 migrations, got ${rows[0].count}`);
+              console.log("Verified 35 applied migrations");
+            } finally { await pool.end(); }
+          '
+      - name: Reapply migrations (idempotency and checksum check)
+        run: npm run migrate --workspace @medicare/api
+
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan dependencies and secrets (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

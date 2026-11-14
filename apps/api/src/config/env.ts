@@ -114,6 +114,84 @@ export function validateEnv(input: Record<string, unknown>) {
     if (offenders.length) {
       throw new Error(`Unsafe production configuration: ${offenders.join(", ")} still contain development placeholders`);
     }
+    // Identity metadata and signing keys must be fetched over authenticated TLS.
+    // Never allow credentials or URL fragments in configured OIDC endpoints.
+    for (const key of ["OIDC_ISSUER_URL", "OIDC_JWKS_URL"] as const) {
+      try {
+        const url = new URL(String(merged[key]));
+        if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
+            url.search || url.hash) {
+          throw new Error("insecure");
+        }
+      } catch {
+        throw new Error(`${key} must be an HTTPS URL without credentials, query or fragment in production`);
+      }
+    }
+    // Explicit HTTPS origins only: the development localhost default and
+    // wildcard CORS are not suitable for a patient-facing production API.
+    const origins = String(merged.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim());
+    if (origins.some((origin) => {
+      try {
+        const url = new URL(origin);
+        return url.protocol !== "https:" || url.origin !== origin || Boolean(url.username || url.password);
+      } catch {
+        return true;
+      }
+    })) {
+      throw new Error("CORS_ORIGINS must contain only explicit HTTPS origins in production");
+    }
+    // A production deployment must not issue simulated payment confirmations.
+    if (merged.PAYMENT_PROVIDER !== "robokassa") {
+      throw new Error("PAYMENT_PROVIDER must be robokassa in production");
+    }
+    if (merged.ROBOKASSA_TEST_MODE !== "false") {
+      throw new Error("ROBOKASSA_TEST_MODE must be disabled in production");
+    }
+    if (!merged.ROBOKASSA_MERCHANT_LOGIN || !merged.ROBOKASSA_PASSWORD1 || !merged.ROBOKASSA_PASSWORD2) {
+      throw new Error("Production Robokassa credentials are required");
+    }
+    // Video consultations must never silently run without a configured SFU.
+    // Both API and browser-facing endpoints must use encrypted transport.
+    if (!merged.LIVEKIT_API_KEY || !merged.LIVEKIT_API_SECRET || !merged.LIVEKIT_URL || !merged.LIVEKIT_PUBLIC_URL) {
+      throw new Error("Production LiveKit credentials and both endpoints are required");
+    }
+    for (const key of ["LIVEKIT_URL", "LIVEKIT_PUBLIC_URL"] as const) {
+      try {
+        const url = new URL(String(merged[key]));
+        if (!["https:", "wss:"].includes(url.protocol) || !url.hostname ||
+            url.username || url.password || url.search || url.hash) {
+          throw new Error("insecure");
+        }
+      } catch {
+        throw new Error(`${key} must be an HTTPS or WSS URL without credentials, query or fragment in production`);
+      }
+    }
+    // Explicit encrypted object storage is mandatory for clinical files.
+    if (!merged.S3_ENDPOINT) {
+      throw new Error("S3_ENDPOINT must be explicitly configured in production");
+    }
+    try {
+      const endpoint = new URL(String(merged.S3_ENDPOINT));
+      if (endpoint.protocol !== "https:" || !endpoint.hostname ||
+          endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+        throw new Error("insecure");
+      }
+    } catch {
+      throw new Error("S3_ENDPOINT must be an HTTPS URL without credentials or query parameters in production");
+    }
+    if (!merged.S3_ACCESS_KEY || !merged.S3_SECRET_KEY) {
+      throw new Error("Production S3 credentials are required");
+    }
+    if (merged.REQUIRE_PRIVILEGED_MFA !== "true") {
+      throw new Error("REQUIRE_PRIVILEGED_MFA must be enabled in production");
+    }
+    // Never mark uploaded clinical files as clean without an actual scanner.
+    if (merged.DOCUMENT_SCAN_PROVIDER !== "clamav") {
+      throw new Error("DOCUMENT_SCAN_PROVIDER must be clamav in production");
+    }
+    if (merged.DOCUMENT_SCAN_WORKER_ENABLED !== "true") {
+      throw new Error("DOCUMENT_SCAN_WORKER_ENABLED must be enabled in production");
+    }
     if (merged.RATE_LIMIT_ENABLED === "false") {
       throw new Error("RATE_LIMIT_ENABLED must not be disabled in production");
     }
