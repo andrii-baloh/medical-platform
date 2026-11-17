@@ -93,15 +93,18 @@ jobs:
         run: npm ci
       - name: Apply database migrations
         run: npm run migrate --workspace @medicare/api
-      - name: Verify all 35 migrations recorded
+      - name: Verify every SQL migration recorded
         run: |
           node --input-type=module -e '
+            import { readdirSync } from "node:fs";
             import pg from "pg";
+            const expected = readdirSync("db/migrations").filter((name) => /^\\d+_.*\\.sql$/.test(name)).length;
+            if (expected === 0) throw new Error("No SQL migration files found");
             const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
             try {
               const {rows} = await pool.query("select count(*)::int as count from schema_migrations");
-              if (rows[0].count !== 35) throw new Error(`Expected 35 migrations, got ${rows[0].count}`);
-              console.log("Verified 35 applied migrations");
+              if (rows[0].count !== expected) throw new Error(`Expected ${expected} migrations, got ${rows[0].count}`);
+              console.log(`Verified all ${expected} applied migrations`);
             } finally { await pool.end(); }
           '
       - name: Reapply migrations (idempotency and checksum check)
