@@ -21,13 +21,20 @@ Some files extracted from one containerd snapshot were zero-filled. Recovery sel
 
 The recovered `package-lock.json` from an older build layer did not match the final package manifests. It is preserved as `package-lock.recovered-original.json`; the active lockfile was regenerated from the recovered 0.13 manifests before validation.
 
+
+## GitHub Actions verification — 2026-11-13
+
+- [Run 43442390640](https://github.com/andrii-baloh/medical-platform/actions/runs/43442390640), commit `224d41fef9abfeab6680320c8a41daf51f4e0f0b`: `migrations` job **passed** using the PostgreSQL 16 service. All 35 SQL migrations (001–035) were applied, the `schema_migrations` count was checked, and the migrator was run again to verify repeat execution.
+- The overall workflow **failed**: `verify` failed at `Production dependency audit` (`npm audit --omit=dev --audit-level=high`), and `trivy` failed at `Scan dependencies and secrets (Trivy)`. These security gates remain blockers; do not interpret the successful migration job as production readiness.
+- This CI run does **not** establish end-to-end application behavior, OIDC, object storage, malware scanning, LiveKit sessions, or deployment readiness. Those runtime checks remain unverified.
+
 ## Runtime not yet verified
 
 Docker Desktop currently reports a WSL command failure on this computer. Consequently, the following are not yet claimed as passed after recovery:
 
 - image pull/build against the Docker daemon
 - service startup/health for PostgreSQL, Keycloak, MinIO, ClamAV and LiveKit
-- migration execution against a running PostgreSQL instance
+- migration execution in the recovered local Docker stack (separate from the successful PostgreSQL 16 GitHub Actions migration job)
 - browser OIDC login
 - MinIO signed upload/download
 - ClamAV scan pipeline

@@ -40,7 +40,7 @@ Stage 21 adds the security incident workflow: `security_incidents` plus an appen
 
 Stage 22 adds remote patient monitoring: programs, enrollments tied to the treating doctor, measurement ingest with threshold evaluation in the same transaction, clinical alerts, device registry and periodic reviews. See `docs/MONITORING.md`.
 
-Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `031_retention_policies.sql`. Existing applied migrations must never be edited; add a new migration instead.
+Database migrations are in `db/migrations` and currently run from `001_initial.sql` through `035_retention_legal_holds.sql` (35 files). Migrations `034` and `035` extend security incident management and retention legal holds. Existing applied migrations must never be edited; add a new migration instead.
 
 ## EGISZ / REMD boundary
 
@@ -75,11 +75,13 @@ Development endpoints:
 ```powershell
 node scripts/check-infra.cjs
 npm run typecheck
+npm run test --workspace @medicare/api
 npm run build
+npm audit --omit=dev --audit-level=high
 docker compose --env-file .env.example config --quiet
 ```
 
-The migration runner records SHA-256 checksums in `schema_migrations`.
+The migration runner records SHA-256 checksums in `schema_migrations`. Tests and dependency checks are configured in `.github/workflows/ci.yml`. The high-severity dependency gate may fail until all remaining advisories are resolved; do not treat a green typecheck/build as proof of production readiness.
 
 ## Security boundary
 

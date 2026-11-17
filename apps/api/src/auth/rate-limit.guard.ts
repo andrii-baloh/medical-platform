@@ -58,12 +58,12 @@ export class RateLimitGuard implements CanActivate {
   }
 
   private clientIp(request: Request): string {
-    if ((process.env.TRUST_PROXY ?? "false") === "true") {
-      const forwarded = request.headers["x-forwarded-for"];
-      const first = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0];
-      if (first?.trim()) return first.trim();
-    }
-    return request.ip || request.socket.remoteAddress || "unknown";
+    // Never read X-Forwarded-For directly: a caller can supply an arbitrary
+    // value and rotate it to evade the unauthenticated rate limit. Express's
+    // request.ip is safe only when its trust proxy policy is configured with
+    // explicit trusted proxy addresses/hops. Until that is implemented, use
+    // the actual TCP peer address (conservative behind a reverse proxy).
+    return request.socket.remoteAddress || "unknown";
   }
 
   private cleanup(now: number, windowMs: number) {
